@@ -1,1 +1,43 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Dashboard Keselamatan</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <main class="container card">
+    <a href="index.html">← Kembali</a>
+    <h2>Dashboard Keselamatan</h2>
+
+    <div class="login-box card small" id="loginBox">
+      <label>Email</label>
+      <input id="loginEmail" type="email" />
+      <label>Password</label>
+      <input id="loginPass" type="password" />
+      <div class="row" style="margin-top:8px">
+        <button id="loginBtn">Log Masuk</button>
+        <button id="logoutBtn" style="display:none" class="btn-ghost">Log Keluar</button>
+      </div>
+      <div id="loginMsg" class="small" style="margin-top:8px"></div>
+    </div>
+
+    <div id="dashboardArea" style="display:none">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <div class="small">Log masuk sebagai: <span id="who"></span></div>
+        <div>
+          <button id="reloadBtn" class="btn-ghost">Refresh</button>
+        </div>
+      </div>
+
+      <div id="listArea" style="margin-top:12px"></div>
+    </div>
+
+  </main>
+
+  <script type="module" src="js/firebase-init.js"></script>
+  <script type="module" src="js/dashboard.js"></script>
+</body>
+</html>
 
