@@ -10,7 +10,7 @@
   <main class="container card">
     <a href="index.html" class="small">← Kembali</a>
     <h2>Borang Daftar Pelawat</h2>
-    <p class="small">Sila isi maklumat pelawat. Medan bertanda * wajib diisi.</p>
+    <p class="small">Sila lengkapkan maklumat pelawat. Medan bertanda * wajib diisi.</p>
 
     <form id="visitorForm" class="form-grid" autocomplete="off" novalidate>
       <h3 style="grid-column:1/-1;margin:0;font-size:16px">Bahagian 1 — Butiran Penghuni</h3>
@@ -48,6 +48,17 @@
       </div>
 
       <div>
+        <label for="eta">Tarikh ETA *</label>
+        <input id="eta" name="eta" type="date" required />
+      </div>
+
+      <div>
+        <label for="etd">Tarikh ETD</label>
+        <input id="etd" name="etd" type="date" />
+      </div>
+
+      <!-- Kategori dipindahkan ke bawah Bahagian 2 seperti diminta -->
+      <div class="col-span-2">
         <label for="category">Kategori *</label>
         <select id="category" name="category" required>
           <option value="Pelawat">Pelawat</option>
@@ -56,16 +67,6 @@
           <option value="Pindah Rumah">Pindah Rumah</option>
           <option value="Pelawat Khas">Pelawat Khas</option>
         </select>
-      </div>
-
-      <div>
-        <label for="eta">Tarikh / Masa ETA *</label>
-        <input id="eta" name="eta" type="datetime-local" required />
-      </div>
-
-      <div>
-        <label for="etd">Tarikh / Masa ETD</label>
-        <input id="etd" name="etd" type="datetime-local" />
       </div>
 
       <div class="col-span-2">
