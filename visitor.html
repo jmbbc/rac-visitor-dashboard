@@ -1,50 +1,74 @@
-<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Borang Daftar Pelawat</title>
-  <link rel="stylesheet" href="css/style.css">
-</head>
-<body>
-  <main class="container card">
-    <a href="index.html">← Kembali</a>
-    <h2>Borang Daftar Pelawat</h2>
+<form id="visitorForm" class="form-grid" autocomplete="off" novalidate>
+  <h3 style="grid-column:1/-1;margin:0;font-size:16px">Bahagian 1 — Butiran Penghuni</h3>
 
-    <form id="visitorForm">
-      <label for="name">Nama</label>
-      <input id="name" name="name" required />
+  <div>
+    <label for="hostUnit">Nombor Unit Rumah Penghuni *</label>
+    <input id="hostUnit" name="hostUnit" required placeholder="Contoh: A-12-03" />
+  </div>
 
-      <label for="unit">Unit / No</label>
-      <input id="unit" name="unit" required />
+  <div>
+    <label for="hostName">Nama Penghuni *</label>
+    <input id="hostName" name="hostName" required placeholder="Nama penghuni" />
+  </div>
 
-      <label for="category">Kategori</label>
-      <select id="category" name="category">
-        <option value="Lawatan">Lawatan</option>
-        <option value="Pembaikan">Pembaikan</option>
-        <option value="Lain-lain">Lain-lain</option>
-      </select>
+  <div class="col-span-2">
+    <label for="hostPhone">Nombor Telefon Penghuni</label>
+    <input id="hostPhone" name="hostPhone" type="tel" inputmode="tel" placeholder="012-3456789" />
+  </div>
 
-      <label for="vehicle">Nombor Kenderaan (optional)</label>
-      <input id="vehicle" name="vehicle" />
+  <h3 style="grid-column:1/-1;margin:0;font-size:16px;margin-top:6px">Bahagian 2 — Butiran Pelawat</h3>
 
-      <label for="eta">Tarikh/Masa ETA</label>
-      <input id="eta" type="datetime-local" required />
+  <div class="col-span-2">
+    <label for="name">Nama Pelawat *</label>
+    <input id="name" name="name" required placeholder="Contoh: Ahmad bin Ali" />
+  </div>
 
-      <label for="etd">Tarikh/Masa ETD (optional)</label>
-      <input id="etd" type="datetime-local" />
+  <div>
+    <label for="phone">No Telefon Pelawat</label>
+    <input id="phone" name="phone" type="tel" inputmode="tel" placeholder="012-3456789" />
+  </div>
 
-      <div class="row">
-        <button type="submit">Hantar</button>
-        <button type="button" class="btn-ghost" id="clearBtn">Kosongkan</button>
-      </div>
-    </form>
+  <div>
+    <label for="vehicle">No Plat Kenderaan</label>
+    <input id="vehicle" name="vehicle" placeholder="ABC1234" />
+  </div>
 
-    <div id="statusMsg" style="margin-top:12px"></div>
-  </main>
+  <div>
+    <label for="category">Kategori *</label>
+    <select id="category" name="category" required>
+      <option value="Pelawat">Pelawat</option>
+      <option value="Kontraktor">Kontraktor</option>
+      <option value="Penghantaran Barang">Penghantaran Barang</option>
+      <option value="Pindah Rumah">Pindah Rumah</option>
+      <option value="Pelawat Khas">Pelawat Khas</option>
+    </select>
+  </div>
 
-  <script type="module" src="js/firebase-init.js"></script>
-  <script type="module" src="js/visitor.js"></script>
-</body>
-</html>
+  <div>
+    <label for="eta">Tarikh / Masa ETA *</label>
+    <input id="eta" name="eta" type="datetime-local" required />
+  </div>
 
+  <div>
+    <label for="etd">Tarikh / Masa ETD</label>
+    <input id="etd" name="etd" type="datetime-local" />
+  </div>
+
+  <div class="col-span-2">
+    <label for="note">Catatan (optional)</label>
+    <textarea id="note" name="note" rows="3" placeholder="Maklumat tambahan"></textarea>
+  </div>
+
+  <div>
+    <label for="parking">Perlu Tempat Parking?</label>
+    <select id="parking" name="parking">
+      <option value="No">Tidak</option>
+      <option value="Yes">Ya</option>
+    </select>
+  </div>
+
+  <div class="form-actions col-span-2">
+    <button type="submit" class="btn">Hantar Daftar</button>
+    <button type="button" id="clearBtn" class="btn btn-ghost">Kosongkan</button>
+  </div>
+</form>
