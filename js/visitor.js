@@ -1,3 +1,28 @@
+// at top of js/visitor.js (before using window.__FIRESTORE)
+function waitForFirestore(timeout = 3000){
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+    (function check(){
+      if (window.__FIRESTORE) return resolve(window.__FIRESTORE);
+      if (Date.now() - start > timeout) return reject(new Error('Firestore not available'));
+      setTimeout(check, 50);
+    })();
+  });
+}
+
+// then in async init:
+(async ()=> {
+  try {
+    await waitForFirestore();
+    initForm(); // existing code that attaches event listener and uses collection(...)
+  } catch(err){
+    console.error('Firestore init failed', err);
+    document.getElementById('statusMsg').textContent = 'Initialisasi gagal. Semak konsol.';
+  }
+})();
+
+
+
 import { collection, addDoc, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
 const form = document.getElementById('visitorForm');
