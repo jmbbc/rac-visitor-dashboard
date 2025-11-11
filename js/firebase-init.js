@@ -2,12 +2,12 @@
   // ===== REPLACE these values with your Firebase web app config =====
   // Get them from Firebase Console → Project settings → Your apps (Web)
   const firebaseConfig = {
-    apiKey: "REPLACE_API_KEY",
-    authDomain: "REPLACE_AUTH_DOMAIN",
-    projectId: "REPLACE_PROJECT_ID",
-    storageBucket: "REPLACE_STORAGE_BUCKET",
-    messagingSenderId: "REPLACE_MESSAGING_SENDER_ID",
-    appId: "REPLACE_APP_ID"
+    apiKey: "AIzaSyDxN4OAFzzsQ9clUG9RqewWZ6hJ4HIWLMc",
+    authDomain: "banjariavisitor.firebaseapp.com",
+    projectId: "banjariavisitor",
+    storageBucket: "banjariavisitor.firebasestorage.app",
+    messagingSenderId: "82057315329",
+    appId: "1:82057315329:web:7ad070a5a4fc6ecac82c00"
   };
   // ==================================================================
 
