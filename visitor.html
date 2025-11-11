@@ -1,1 +1,50 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Borang Daftar Pelawat</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <main class="container card">
+    <a href="index.html">← Kembali</a>
+    <h2>Borang Daftar Pelawat</h2>
+
+    <form id="visitorForm">
+      <label for="name">Nama</label>
+      <input id="name" name="name" required />
+
+      <label for="unit">Unit / No</label>
+      <input id="unit" name="unit" required />
+
+      <label for="category">Kategori</label>
+      <select id="category" name="category">
+        <option value="Lawatan">Lawatan</option>
+        <option value="Pembaikan">Pembaikan</option>
+        <option value="Lain-lain">Lain-lain</option>
+      </select>
+
+      <label for="vehicle">Nombor Kenderaan (optional)</label>
+      <input id="vehicle" name="vehicle" />
+
+      <label for="eta">Tarikh/Masa ETA</label>
+      <input id="eta" type="datetime-local" required />
+
+      <label for="etd">Tarikh/Masa ETD (optional)</label>
+      <input id="etd" type="datetime-local" />
+
+      <div class="row">
+        <button type="submit">Hantar</button>
+        <button type="button" class="btn-ghost" id="clearBtn">Kosongkan</button>
+      </div>
+    </form>
+
+    <div id="statusMsg" style="margin-top:12px"></div>
+  </main>
+
+  <script type="module" src="js/firebase-init.js"></script>
+  <script type="module" src="js/visitor.js"></script>
+</body>
+</html>
 
