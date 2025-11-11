@@ -10,31 +10,34 @@
   <main class="container card">
     <a href="index.html" class="small">← Kembali</a>
     <h2>Borang Daftar Pelawat</h2>
-    <p class="small">Sila lengkapkan maklumat pelawat. Medan bertanda * wajib diisi.</p>
+    <p class="small">Sila lengkapkan maklumat. Medan bertanda * wajib diisi.</p>
 
     <form id="visitorForm" class="form-grid" autocomplete="off" novalidate>
+      <!-- Bahagian 1: Butiran Penghuni -->
       <h3 style="grid-column:1/-1;margin:0;font-size:16px">Bahagian 1 — Butiran Penghuni</h3>
 
       <div>
-        <label for="hostUnit">Nombor Unit Rumah Penghuni *</label>
+        <label for="hostUnit">Unit rumah *</label>
         <input id="hostUnit" name="hostUnit" required placeholder="Contoh: A-12-03" />
       </div>
 
       <div>
-        <label for="hostName">Nama Penghuni *</label>
+        <label for="hostName">Nama penghuni *</label>
         <input id="hostName" name="hostName" required placeholder="Nama penghuni" />
       </div>
 
       <div class="col-span-2">
-        <label for="hostPhone">Nombor Telefon Penghuni</label>
+        <label for="hostPhone">Nombor telefon penghuni</label>
         <input id="hostPhone" name="hostPhone" type="tel" inputmode="tel" placeholder="012-3456789" />
       </div>
 
-      <h3 style="grid-column:1/-1;margin:0;font-size:16px;margin-top:6px">Bahagian 2 — Butiran Pelawat</h3>
+      <!-- Bahagian 2: Butiran Kemasukkan -->
+      <h3 style="grid-column:1/-1;margin:0;font-size:16px;margin-top:6px">Bahagian 2 — Butiran Kemasukkan</h3>
 
-      <div class="col-span-2">
+      <div>
         <label for="category">Kategori *</label>
         <select id="category" name="category" required>
+          <option value="">— Pilih —</option>
           <option value="Pelawat">Pelawat</option>
           <option value="Kontraktor">Kontraktor</option>
           <option value="Penghantaran Barang">Penghantaran Barang</option>
@@ -42,20 +45,29 @@
           <option value="Pelawat Khas">Pelawat Khas</option>
         </select>
       </div>
-      
+
       <div class="col-span-2">
-        <label for="name">Nama Pelawat *</label>
-        <input id="name" name="name" required placeholder="Contoh: Ahmad bin Ali" />
+        <label for="entryDetails">Butiran kemasukkan</label>
+        <input id="entryDetails" name="entryDetails" placeholder="Contoh: Servis penghawa dingin / Hantar barang" />
+      </div>
+
+      <div class="col-span-2">
+        <label for="visitorName">Nama pelawat *</label>
+        <input id="visitorName" name="visitorName" required placeholder="Nama pelawat" />
       </div>
 
       <div>
-        <label for="phone">No Telefon Pelawat</label>
-        <input id="phone" name="phone" type="tel" inputmode="tel" placeholder="012-3456789" />
+        <label for="visitorPhone">Nombor telefon pelawat</label>
+        <input id="visitorPhone" name="visitorPhone" type="tel" inputmode="tel" placeholder="012-3456789" />
       </div>
 
       <div>
-        <label for="vehicle">No Plat Kenderaan</label>
-        <input id="vehicle" name="vehicle" placeholder="ABC1234" />
+        <label for="stayOver">Bermalam?</label>
+        <select id="stayOver" name="stayOver" disabled>
+          <option value="No">Tidak Bermalam</option>
+          <option value="Yes">Bermalam</option>
+        </select>
+        <div class="small" id="stayHint">(Pilihan ini aktif jika kategori = Pelawat)</div>
       </div>
 
       <div>
@@ -66,18 +78,41 @@
       <div>
         <label for="etd">Tarikh ETD</label>
         <input id="etd" name="etd" type="date" />
+        <div class="small" id="etdHint">ETD boleh dipilih sehingga 3 hari selepas ETA</div>
+      </div>
+
+      <!-- Bahagian 3: Butiran Kenderaan -->
+      <h3 style="grid-column:1/-1;margin:0;font-size:16px;margin-top:6px">Bahagian 3 — Butiran Kenderaan</h3>
+
+      <!-- single vehicle input (default shown for non-Pelawat Khas) -->
+      <div id="vehicleSingleWrap">
+        <label for="vehicleNo">Nombor kenderaan</label>
+        <input id="vehicleNo" name="vehicleNo" placeholder="ABC1234" />
+      </div>
+
+      <!-- dynamic vehicle inputs for Pelawat Khas (hidden by default) -->
+      <div id="vehicleMultiWrap" style="display:none;grid-column:1/-1">
+        <label>Nombor kenderaan (boleh tambah lebih dari 1)</label>
+        <div id="vehicleList"></div>
+        <div style="margin-top:8px">
+          <button type="button" id="addVehicleBtn" class="btn btn-ghost">+ Tambah Nombor Kenderaan</button>
+        </div>
+        <div class="small" style="margin-top:6px">Tekan + untuk tambah baris; gunakan – untuk keluarkan baris.</div>
       </div>
 
       <div>
-        <label for="parking">Perlu Tempat Parking?</label>
-        <select id="parking" name="parking">
-          <option value="No">Tidak</option>
-          <option value="Yes">Ya</option>
+        <label for="vehicleType">Jenis kenderaan</label>
+        <select id="vehicleType" name="vehicleType">
+          <option value="Kereta / 4x4">Kereta / 4x4</option>
+          <option value="Lori">Lori</option>
+          <option value="Motosikal">Motosikal</option>
+          <option value="Pejalan Kaki">Pejalan Kaki</option>
         </select>
       </div>
 
+      <!-- aksi -->
       <div class="form-actions col-span-2">
-        <button type="submit" class="btn">Hantar Daftar</button>
+        <button type="submit" class="btn">Hantar</button>
         <button type="button" id="clearBtn" class="btn btn-ghost">Kosongkan</button>
       </div>
     </form>
