@@ -8,10 +8,10 @@
   <!-- Inter font -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
 
-  <!-- Optional: Tailwind utilities (keperluan terserah) -->
+  <!-- Optional utilities -->
   <script src="https://v1.tailwindcss.com"></script>
 
-  <!-- main site CSS -->
+  <!-- main site CSS (pastikan path betul: css/style.css atau ubah href jika anda guna folder lain) -->
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -74,7 +74,7 @@
         </div>
 
         <div id="companyWrap" class="form-row span-2 hidden">
-          <label for="companyName">Nama syarikat</label>
+          <label for="companyName" class="">Nama syarikat</label>
           <input id="companyName" name="companyName" placeholder="Nama syarikat" />
         </div>
 
@@ -118,9 +118,14 @@
         </div>
 
         <div id="vehicleMultiWrap" class="form-row span-2 hidden">
-          <label>Nombor kenderaan</label>
-          <div id="vehicleList"></div>
-          <div class="field-note">Tekan + untuk tambah baris; gunakan – untuk keluarkan baris.</div>
+          <label for="vehicleList">Nombor kenderaan</label>
+          <div>
+            <div id="vehicleList" class="vehicle-list"></div>
+            <div style="margin-top:8px; display:flex; gap:8px; align-items:center;">
+              <button type="button" id="addVehicleBtn" class="btn-ghost" style="padding:6px 10px;border-radius:8px;">+ Tambah Nombor Kenderaan</button>
+              <span class="field-note" style="margin-left:8px; font-size:12px; color:var(--muted);">Tekan + untuk tambah baris; gunakan − untuk keluarkan baris.</span>
+            </div>
+          </div>
         </div>
 
         <div class="form-row">
