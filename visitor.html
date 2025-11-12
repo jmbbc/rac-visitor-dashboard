@@ -8,10 +8,10 @@
   <!-- Inter font -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
 
-  <!-- Tailwind v1 (optional, keeps previous utilities) -->
+  <!-- Optional: Tailwind utilities (keperluan terserah) -->
   <script src="https://v1.tailwindcss.com"></script>
 
-  <!-- main site CSS (pastikan style/style.css mengandungi rules sebelumnya + .form-row tambahan) -->
+  <!-- main site CSS -->
   <link rel="stylesheet" href="style/style.css">
 </head>
 <body>
@@ -26,7 +26,7 @@
 
         <div style="display:flex;gap:8px;align-items:center">
           <label for="themeToggle" class="small muted">Tema</label>
-          <button id="themeToggle" style="padding:6px 10px;border-radius:6px;border:1px solid #e5e7eb;background:#fff;font-weight:600">Light</button>
+          <button id="themeToggle" style="padding:6px 10px;border-radius:6px;border:1px solid var(--input-border);background:var(--card);font-weight:600">Light</button>
         </div>
       </header>
 
@@ -51,7 +51,7 @@
           <input id="hostPhone" name="hostPhone" type="tel" inputmode="tel" placeholder="012-3456789" />
         </div>
 
-        <hr style="border:none;border-top:1px solid #e5e7eb;margin:12px 0" />
+        <hr style="border:none;border-top:1px solid var(--input-border);margin:12px 0" />
 
         <!-- Bahagian 2 -->
         <h3 style="margin:0 0 8px 0">Bahagian 2 — Butiran Kemasukkan</h3>
@@ -107,7 +107,7 @@
           <div class="field-note">ETD boleh dipilih sehingga 3 hari selepas ETA</div>
         </div>
 
-        <hr style="border:none;border-top:1px solid #e5e7eb;margin:12px 0" />
+        <hr style="border:none;border-top:1px solid var(--input-border);margin:12px 0" />
 
         <!-- Bahagian 3 -->
         <h3 style="margin:0 0 8px 0">Bahagian 3 — Butiran Kenderaan</h3>
