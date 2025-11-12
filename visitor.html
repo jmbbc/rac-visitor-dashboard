@@ -1,129 +1,200 @@
 <!doctype html>
-<html>
+<html lang="ms" class="dark"> <!-- default: dark -->
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Borang Daftar Pelawat — RAC</title>
-  <link rel="stylesheet" href="css/style.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Borang Daftar Pelawat — Banjaria Court</title>
+
+  <!-- Tailwind v1 CDN -->
+  <script src="https://v1.tailwindcss.com"></script>
+
+  <style>
+    /* theme-aware custom tokens */
+    :root {
+      --bg: #ffffff;
+      --card: #ffffff;
+      --text: #0f172a;
+      --muted: #6b7280;
+      --primary: #4f46e5; /* indigo-600 */
+      --danger: #ef4444;
+      --success: #16a34a;
+      --input-bg: #ffffff;
+      --input-border: #d1d5db;
+    }
+    html.dark {
+      --bg: #0b1220;
+      --card: #071024;
+      --text: #e6eef8;
+      --muted: #93a2bf;
+      --primary: #7c3aed; /* brighter indigo for dark */
+      --danger: #fecaca;
+      --success: #bbf7d0;
+      --input-bg: #061226;
+      --input-border: #243449;
+    }
+
+    /* small overrides mapped to Tailwind-like classes */
+    body { background: var(--bg); color: var(--text); }
+    .card-surface { background: var(--card); border: 1px solid rgba(255,255,255,0.03); }
+    .muted { color: var(--muted); }
+    .btn-primary { background: var(--primary); color: white; }
+    input, select, textarea {
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      color: var(--text);
+    }
+
+    /* toast */
+    .toast { position: fixed; right: 16px; top: 16px; z-index: 60; padding: 10px 14px; border-radius: 8px; box-shadow: 0 6px 18px rgba(2,6,23,0.6); font-weight: 600; }
+    .toast.ok { background: #052e16; color: #bbf7d0; }
+    .toast.err { background: #3b0b0b; color: #fee2e2; }
+
+    /* conflict highlight (dashboard related) */
+    tr.conflict { background-color: rgba(255, 59, 48, 0.06); }
+
+    /* hide helper for Tailwind 'hidden' compat when toggling via JS */
+    .hidden { display:none !important; }
+  </style>
 </head>
-<body>
-  <main class="container card">
-    <a href="index.html" class="small">← Kembali</a>
-    <h2>Borang Daftar Pelawat</h2>
-    <p class="small">Sila lengkapkan maklumat. Medan bertanda * wajib diisi.</p>
-
-    <form id="visitorForm" class="form-grid" autocomplete="off" novalidate>
-      <!-- Bahagian 1: Butiran Penghuni -->
-      <h3 style="grid-column:1/-1;margin:0;font-size:16px">Bahagian 1 — Butiran Penghuni</h3>
-
+<body class="antialiased">
+  <main class="max-w-3xl mx-auto p-6">
+    <header class="flex items-center justify-between mb-6">
       <div>
-        <label for="hostUnit">Unit rumah *</label>
-        <input id="hostUnit" name="hostUnit" required placeholder="Contoh: A-12-03" />
+        <a href="index.html" class="text-sm muted hover:underline">← Kembali</a>
+        <h1 class="text-2xl font-semibold mt-2">Borang Daftar Pelawat</h1>
+        <p class="text-sm muted mt-1">Sila lengkapkan maklumat. Medan bertanda <span class="text-red-500 font-semibold">*</span> wajib diisi.</p>
       </div>
 
-      <div>
-        <label for="hostName">Nama penghuni *</label>
-        <input id="hostName" name="hostName" required placeholder="Nama penghuni" />
+      <div class="flex items-center gap-3">
+        <label for="themeToggle" class="text-sm muted">Tema</label>
+        <button id="themeToggle" class="px-3 py-2 border rounded-md text-sm" title="Tukar tema">Light</button>
       </div>
+    </header>
 
-      <div class="col-span-2">
-        <label for="hostPhone">Nombor telefon penghuni</label>
-        <input id="hostPhone" name="hostPhone" type="tel" inputmode="tel" placeholder="012-3456789" />
-      </div>
-
-      <!-- Bahagian 2: Butiran Kemasukkan -->
-      <h3 style="grid-column:1/-1;margin:0;font-size:16px;margin-top:6px">Bahagian 2 — Butiran Kemasukkan</h3>
-
-      <div>
-        <label for="category">Kategori *</label>
-        <select id="category" name="category" required>
-          <option value="">— Pilih —</option>
-          <option value="Pelawat">Pelawat</option>
-          <option value="Kontraktor">Kontraktor</option>
-          <option value="Penghantaran Barang">Penghantaran Barang</option>
-          <option value="Pindah Rumah">Pindah Rumah</option>
-          <option value="Pelawat Khas">Pelawat Khas</option>
-        </select>
-      </div>
-
-      <div class="col-span-2">
-        <label for="entryDetails">Butiran kemasukkan</label>
-        <input id="entryDetails" name="entryDetails" placeholder="Contoh: Servis penghawa dingin / Hantar barang" />
-      </div>
-
-      <!-- Nama syarikat: hanya aktif untuk beberapa kategori -->
-      <div id="companyWrap" class="col-span-2" style="display:none">
-        <label for="companyName">Nama syarikat</label>
-        <input id="companyName" name="companyName" placeholder="Nama syarikat (aktif untuk kontraktor / penghantaran / pindah)" />
-      </div>
-
-      <div class="col-span-2">
-        <label for="visitorName">Nama pelawat *</label>
-        <input id="visitorName" name="visitorName" required placeholder="Nama pelawat" />
-      </div>
-
-      <div>
-        <label for="visitorPhone">Nombor telefon pelawat</label>
-        <input id="visitorPhone" name="visitorPhone" type="tel" inputmode="tel" placeholder="012-3456789" />
-      </div>
-
-      <div>
-        <label for="stayOver">Bermalam?</label>
-        <select id="stayOver" name="stayOver" disabled>
-          <option value="No">Tidak Bermalam</option>
-          <option value="Yes">Bermalam</option>
-        </select>
-        <div class="small" id="stayHint">(Pilihan ini aktif jika kategori = Pelawat)</div>
-      </div>
-
-      <div>
-        <label for="eta">Tarikh ETA *</label>
-        <input id="eta" name="eta" type="date" required />
-      </div>
-
-      <div>
-        <label for="etd">Tarikh ETD</label>
-        <input id="etd" name="etd" type="date" />
-        <div class="small" id="etdHint">ETD boleh dipilih sehingga 3 hari selepas ETA</div>
-      </div>
-
-      <!-- Bahagian 3: Butiran Kenderaan -->
-      <h3 style="grid-column:1/-1;margin:0;font-size:16px;margin-top:6px">Bahagian 3 — Butiran Kenderaan</h3>
-
-      <div id="vehicleSingleWrap">
-        <label for="vehicleNo">Nombor kenderaan</label>
-        <input id="vehicleNo" name="vehicleNo" placeholder="ABC1234" />
-      </div>
-
-      <div id="vehicleMultiWrap" style="display:none;grid-column:1/-1">
-        <label>Nombor kenderaan (boleh tambah lebih dari 1)</label>
-        <div id="vehicleList"></div>
-        <div style="margin-top:8px">
-          <button type="button" id="addVehicleBtn" class="btn btn-ghost">+ Tambah Nombor Kenderaan</button>
+    <section id="formCard" class="card-surface shadow-sm rounded-lg p-6">
+      <form id="visitorForm" class="space-y-6" autocomplete="off" novalidate>
+        <!-- Bahagian 1 -->
+        <div>
+          <h2 class="text-lg font-medium">Bahagian 1 — Butiran Penghuni</h2>
+          <div class="mt-4 grid gap-4 grid-cols-1 md:grid-cols-2">
+            <div>
+              <label for="hostUnit" class="block text-sm font-medium">Unit rumah <span class="text-red-500">*</span></label>
+              <input id="hostUnit" name="hostUnit" required placeholder="Contoh: A-12-03" class="mt-1 block w-full rounded-md px-3 py-2" />
+            </div>
+            <div>
+              <label for="hostName" class="block text-sm font-medium">Nama penghuni <span class="text-red-500">*</span></label>
+              <input id="hostName" name="hostName" required placeholder="Nama penghuni" class="mt-1 block w-full rounded-md px-3 py-2" />
+            </div>
+            <div class="md:col-span-2">
+              <label for="hostPhone" class="block text-sm font-medium">Nombor telefon penghuni</label>
+              <input id="hostPhone" name="hostPhone" type="tel" inputmode="tel" placeholder="012-3456789" class="mt-1 block w-full rounded-md px-3 py-2" />
+            </div>
+          </div>
         </div>
-        <div class="small" style="margin-top:6px">Tekan + untuk tambah baris; gunakan – untuk keluarkan baris.</div>
-      </div>
 
-      <div>
-        <label for="vehicleType">Jenis kenderaan</label>
-        <select id="vehicleType" name="vehicleType">
-          <option value="Kereta / 4x4">Kereta / 4x4</option>
-          <option value="Lori">Lori</option>
-          <option value="Motosikal">Motosikal</option>
-          <option value="Pejalan Kaki">Pejalan Kaki</option>
-        </select>
-      </div>
+        <hr class="border-t border-gray-200/40" />
 
-      <!-- aksi -->
-      <div class="form-actions col-span-2">
-        <button type="submit" class="btn">Hantar</button>
-        <button type="button" id="clearBtn" class="btn btn-ghost">Kosongkan</button>
-      </div>
-    </form>
+        <!-- Bahagian 2 -->
+        <div>
+          <h2 class="text-lg font-medium">Bahagian 2 — Butiran Kemasukkan</h2>
+          <div class="mt-4 grid gap-4 grid-cols-1 md:grid-cols-2">
+            <div>
+              <label for="category" class="block text-sm font-medium">Kategori <span class="text-red-500">*</span></label>
+              <select id="category" name="category" required class="mt-1 block w-full rounded-md px-3 py-2">
+                <option value="">— Pilih —</option>
+                <option value="Pelawat">Pelawat</option>
+                <option value="Kontraktor">Kontraktor</option>
+                <option value="Penghantaran Barang">Penghantaran Barang</option>
+                <option value="Pindah Rumah">Pindah Rumah</option>
+                <option value="Pelawat Khas">Pelawat Khas</option>
+              </select>
+            </div>
 
-    <div id="statusMsg" style="margin-top:12px"></div>
+            <div class="md:col-span-2">
+              <label for="entryDetails" class="block text-sm font-medium">Butiran kemasukkan</label>
+              <input id="entryDetails" name="entryDetails" placeholder="Contoh: Servis penghawa dingin / Hantar barang" class="mt-1 block w-full rounded-md px-3 py-2" />
+            </div>
+
+            <div id="companyWrap" class="md:col-span-2 hidden">
+              <label for="companyName" class="block text-sm font-medium">Nama syarikat</label>
+              <input id="companyName" name="companyName" placeholder="Nama syarikat" class="mt-1 block w-full rounded-md px-3 py-2" />
+            </div>
+
+            <div class="md:col-span-2">
+              <label for="visitorName" class="block text-sm font-medium">Nama pelawat <span class="text-red-500">*</span></label>
+              <input id="visitorName" name="visitorName" required placeholder="Contoh: Ahmad bin Ali" class="mt-1 block w-full rounded-md px-3 py-2" />
+            </div>
+
+            <div>
+              <label for="visitorPhone" class="block text-sm font-medium">Nombor telefon pelawat</label>
+              <input id="visitorPhone" name="visitorPhone" type="tel" inputmode="tel" placeholder="012-3456789" class="mt-1 block w-full rounded-md px-3 py-2" />
+            </div>
+
+            <div>
+              <label for="stayOver" class="block text-sm font-medium">Bermalam?</label>
+              <select id="stayOver" name="stayOver" disabled class="mt-1 block w-full rounded-md px-3 py-2">
+                <option value="No">Tidak Bermalam</option>
+                <option value="Yes">Bermalam</option>
+              </select>
+              <p id="stayHint" class="text-xs muted mt-1">Pilihan ini aktif jika kategori = Pelawat</p>
+            </div>
+
+            <div>
+              <label for="eta" class="block text-sm font-medium">Tarikh ETA <span class="text-red-500">*</span></label>
+              <input id="eta" name="eta" type="date" required class="mt-1 block w-full rounded-md px-3 py-2" />
+            </div>
+
+            <div>
+              <label for="etd" class="block text-sm font-medium">Tarikh ETD</label>
+              <input id="etd" name="etd" type="date" class="mt-1 block w-full rounded-md px-3 py-2" />
+              <p id="etdHint" class="text-xs muted mt-1">ETD boleh dipilih sehingga 3 hari selepas ETA</p>
+            </div>
+          </div>
+        </div>
+
+        <hr class="border-t border-gray-200/40" />
+
+        <!-- Bahagian 3 -->
+        <div>
+          <h2 class="text-lg font-medium">Bahagian 3 — Butiran Kenderaan</h2>
+          <div class="mt-4 grid gap-4 grid-cols-1 md:grid-cols-2">
+            <div id="vehicleSingleWrap">
+              <label for="vehicleNo" class="block text-sm font-medium">Nombor kenderaan</label>
+              <input id="vehicleNo" name="vehicleNo" placeholder="ABC1234" class="mt-1 block w-full rounded-md px-3 py-2" />
+            </div>
+
+            <div id="vehicleMultiWrap" class="md:col-span-2 hidden">
+              <label class="block text-sm font-medium">Nombor kenderaan (boleh tambah lebih dari 1)</label>
+              <div id="vehicleList" class="mt-2 space-y-2"></div>
+              <div class="mt-2">
+                <button type="button" id="addVehicleBtn" class="px-3 py-2 border rounded-md text-sm">+ Tambah Nombor Kenderaan</button>
+              </div>
+              <p class="text-xs muted mt-2">Tekan + untuk tambah baris; gunakan – untuk keluarkan baris.</p>
+            </div>
+
+            <div>
+              <label for="vehicleType" class="block text-sm font-medium">Jenis kenderaan</label>
+              <select id="vehicleType" name="vehicleType" class="mt-1 block w-full rounded-md px-3 py-2">
+                <option value="Kereta / 4x4">Kereta / 4x4</option>
+                <option value="Lori">Lori</option>
+                <option value="Motosikal">Motosikal</option>
+                <option value="Pejalan Kaki">Pejalan Kaki</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- aksi -->
+        <div class="pt-4 flex items-center gap-3">
+          <button type="submit" id="submitBtn" class="btn-primary px-4 py-2 rounded-md">Hantar</button>
+          <button type="button" id="clearBtn" class="px-4 py-2 border rounded-md">Kosongkan</button>
+          <div id="statusMsg" class="ml-4 text-sm"></div>
+        </div>
+      </form>
+    </section>
   </main>
 
+  <!-- Firebase init then visitor.js -->
   <script type="module" src="js/firebase-init.js"></script>
   <script type="module" src="js/visitor.js"></script>
 </body>
