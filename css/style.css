@@ -231,3 +231,52 @@ select { -webkit-appearance: menulist-button; }
 
 /* ensure option text visible in dropdown list */
 option { color: var(--form-text) !important; background: var(--card) !important; }
+
+/* 1) Gunakan token tema untuk teks input/placeholder */
+:root { --form-text: #111827; --form-placeholder: #6b7280; }
+html.dark { --form-text: #e6eef8; --form-placeholder: #93a2bf; }
+
+/* 2) Pastikan input date nampak teks & background di kedua tema */
+input[type="date"] {
+  color: var(--form-text) !important;
+  background: var(--card) !important;
+  border: 1px solid var(--input-border) !important;
+  min-height: 42px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  -webkit-text-fill-color: var(--form-text) !important; /* webkit fix for some browsers */
+}
+
+/* placeholder / value fallback */
+input[type="date"]::placeholder { color: var(--form-placeholder) !important; }
+
+/* 3) WebKit internal parts (Chrome, Safari) */
+input[type="date"]::-webkit-datetime-edit {
+  color: var(--form-text) !important;
+  background: transparent !important;
+}
+input[type="date"]::-webkit-datetime-edit-text,
+input[type="date"]::-webkit-datetime-edit-day-field,
+input[type="date"]::-webkit-datetime-edit-month-field,
+input[type="date"]::-webkit-datetime-edit-year-field {
+  color: var(--form-text) !important;
+}
+
+/* 4) Calendar picker indicator contrast */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+/* 5) Forced contrast inside dropdown list options (affects some UAs) */
+select, input[type="date"] { color: var(--form-text) !important; background: var(--card) !important; }
+
+/* 6) If you hide native arrow and use custom icon, ensure it's visible in dark */
+.icon-date { color: var(--form-text); }
+
+/* 7) z-index for popup overlays (if custom datepicker used) */
+.flatpickr-calendar, .react-datepicker-popper { z-index: 9999 !important; }
+
+/* 8) Safety: remove accidental transparency */
+input[type="date"], input, select, textarea { opacity: 1 !important; }
+
