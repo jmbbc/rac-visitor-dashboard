@@ -1,124 +1,194 @@
-:root{--bg:#f3f4f6;--card:#fff;--muted:#6b7280;--accent:#2563eb;--ok:#16a34a;--gray:#6b7280}
+:root{
+  --bg:#f3f4f6;
+  --card:#fff;
+  --muted:#6b7280;
+  --accent:#2563eb;
+  --ok:#16a34a;
+  --gray:#6b7280;
+  --input-border:#e5e7eb;
+  --btn-bg:var(--accent);
+}
+
+/* dark theme tokens when html has .dark */
+html.dark{
+  --bg:#0b1220;
+  --card:#071024;
+  --muted:#93a2bf;
+  --accent:#7c3aed;
+  --ok:#bbf7d0;
+  --gray:#93a2bf;
+  --input-border:#243449;
+  --btn-bg:var(--accent);
+}
+
+/* reset / base */
 *{box-sizing:border-box}
-body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);margin:0;color:#111;padding:18px}
+body{
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  background:var(--bg);
+  margin:0;
+  color:var(--text, #111);
+  padding:18px;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+}
 .container{max-width:860px;margin:0 auto}
-.card{background:var(--card);border-radius:8px;padding:18px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.card{
+  background:var(--card);
+  border-radius:8px;
+  padding:18px;
+  box-shadow:0 1px 3px rgba(0,0,0,.06);
+}
+
+/* typography */
 h1{margin-top:0}
-form{display:grid;gap:10px}
 label{font-weight:600;font-size:14px}
-input,select,textarea,button{padding:8px;border-radius:6px;border:1px solid #e5e7eb;font-size:14px}
-button{cursor:pointer;background:var(--accent);color:#fff;border:0;font-weight:700}
-.btn-ghost{background:#6b7280}
+.small{font-size:13px;color:var(--muted)}
+.muted{color:var(--muted)}
+
+/* basic controls */
+input,select,textarea,button{
+  padding:8px;border-radius:6px;border:1px solid var(--input-border);font-size:14px;
+  background:var(--card);color:var(--text, #111);
+}
+button{cursor:pointer;background:var(--btn-bg);color:#fff;border:0;font-weight:700}
+.btn-ghost{background:#6b7280;color:#fff}
+
+/* layout helpers */
 .row{display:flex;gap:8px;align-items:center}
 .table{width:100%;border-collapse:collapse}
-.table th, .table td{padding:8px;border-bottom:1px solid #e5e7eb;text-align:left}
+.table th, .table td{padding:8px;border-bottom:1px solid var(--input-border);text-align:left}
+
+/* status pills */
 .status-pill{padding:6px 8px;border-radius:999px;font-weight:700;font-size:13px;display:inline-block}
 .pill-pending{background:#fef3c7;color:#92400e}
 .pill-in{background:#bbf7d0;color:#065f46}
 .pill-out{background:#e5e7eb;color:#374151}
-.small{font-size:13px;color:var(--muted)}
-.actions{display:flex;gap:8px}
+
+/* toast / message */
 .msg{padding:8px;border-radius:6px;background:#ecfccb;color:#064e3b}
+
+/* login box */
 .login-box{max-width:360px}
-/* --- Form justify / field alignment (append to style/style.css) --- */
-.form-row {
-  display: grid;
-  grid-template-columns: 200px 1fr; /* label kolom tetap + input fleksibel */
-  gap: 6px 12px;
-  align-items: center;
-  margin-bottom: 6px;
+
+/* -------------------------
+   Form justify / alignment
+   (specific selectors to avoid overrides)
+   ------------------------- */
+
+/* wrapper grid: label fixed col + inputs flexible */
+form .form-row{
+  display: grid !important;
+  grid-template-columns: 200px 1fr !important;
+  gap: 6px 12px !important;
+  align-items: center !important;
+  margin-bottom: 6px !important;
 }
 
-@media (max-width: 640px) {
-  .form-row { grid-template-columns: 1fr; }
-  .form-row label { justify-self: start; margin-bottom: 4px; }
+/* span entire row when needed */
+form .form-row.span-2{
+  grid-column: 1 / -1 !important;
+  grid-template-columns: 200px 1fr !important;
 }
 
-/* label */
-.form-row label {
-  font-weight: 700;
-  font-size: 14px;
-  color: var(--gray);
-  justify-self: end; /* label di hujung baris, sejajar ke input */
-  padding-right: 6px;
-}
-
-/* required asterisk style */
-.form-row label.required::after {
-  content: " *";
-  color: #ef4444;
-  margin-left: 4px;
-  font-weight: 700;
-}
-
-/* input/select/textarea uniform */
-.form-row input,
-.form-row select,
-.form-row textarea {
-  width: 100%;
-  min-height: 42px;
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: 1px solid #e5e7eb;
-  background: var(--card);
-  color: #111;
-  box-sizing: border-box;
-  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-  transition: border-color .12s, box-shadow .12s;
-}
-
-/* dark mode adjustments if you add dark variables later */
-@media (prefers-color-scheme: dark) {
-  .form-row input,
-  .form-row select,
-  .form-row textarea {
-    background: #071024;
-    color: #e6eef8;
-    border-color: #243449;
+/* responsive: stack on small screens */
+@media (max-width: 640px){
+  form .form-row{
+    grid-template-columns: 1fr !important;
+  }
+  form .form-row label{
+    justify-self: start !important;
+    margin-bottom: 4px !important;
   }
 }
 
+/* label styling */
+form .form-row label{
+  font-weight:700;
+  font-size:14px;
+  color:var(--gray);
+  justify-self: end;
+  padding-right: 6px;
+}
+
+/* required asterisk */
+form .form-row label.required::after{
+  content: " *";
+  color: #ef4444;
+  margin-left: 4px;
+  font-weight:700;
+}
+
+/* uniform inputs (include common classes to override utilities) */
+form .form-row input,
+form .form-row select,
+form .form-row textarea,
+form .form-row input[type=date],
+form .form-row select.form-control,
+form .form-row input.form-control{
+  width:100% !important;
+  min-height:42px !important;
+  padding:8px 10px !important;
+  border-radius:8px !important;
+  border:1px solid var(--input-border) !important;
+  background:var(--card) !important;
+  color:var(--text, #111) !important;
+  box-sizing:border-box !important;
+  font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif !important;
+  transition: border-color .12s, box-shadow .12s;
+}
+
 /* focus state */
-.form-row input:focus,
-.form-row select:focus,
-.form-row textarea:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 6px 18px rgba(37,99,235,0.08);
+form .form-row input:focus,
+form .form-row select:focus,
+form .form-row textarea:focus{
+  outline:none !important;
+  border-color:var(--accent) !important;
+  box-shadow:0 6px 18px rgba(37,99,235,0.08) !important;
 }
 
-/* fields that should span full width (e.g., section headers or long notes) */
-.form-row.span-2 {
-  grid-column: 1 / -1;
-  grid-template-columns: 200px 1fr;
-}
-
-/* helper texts under inputs (uses same column alignment) */
-.form-row .field-note {
+/* helper note under inputs (aligned to second column) */
+form .form-row .field-note{
   grid-column: 2 / 3;
-  font-size: 12px;
-  color: var(--muted);
-  margin-top: 4px;
+  font-size:12px;
+  color:var(--muted);
+  margin-top:4px;
 }
 
-/* action buttons align to inputs */
-.form-actions {
+/* actions aligned with inputs */
+.form-actions{
   display: grid;
   grid-template-columns: 200px 1fr;
   gap: 0 12px;
   align-items: center;
 }
-.form-actions .actions { justify-self: start; display:flex; gap:8px; }
+.form-actions .actions{ justify-self: start; display:flex; gap:8px; }
 
-/* small responsive tweak: two compact fields on a row (kept optional) */
-.inline-two {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+/* inline two-column helper (use to place two .form-row side-by-side) */
+.inline-two{ display: grid; grid-template-columns: 1fr 1fr; gap:8px; }
+
+/* ensure hidden utility */
+.hidden{ display:none !important; }
+
+/* small table spacing tweak */
+.table th, .table td{ padding:10px 8px; }
+
+/* ensure card padding consistent with inputs */
+.card{ padding:20px; border-radius:10px; }
+
+/* ensure buttons follow theme variables */
+button, .btn{
+  background: var(--btn-bg) !important;
+  color: #fff !important;
+  border: 0 !important;
 }
 
-/* maintain table styling coherence */
-.table th, .table td { padding: 10px 8px; }
+/* ghost button override */
+.btn-ghost{ background:#6b7280 !important; color:#fff !important; }
 
-/* minor: make .card padding consistent with inputs */
-.card { padding: 20px; border-radius: 10px; }
+/* final safety: increase specificity for any tailwind overrides */
+body form .form-row input,
+body form .form-row select,
+body form .form-row textarea{
+  border-radius:8px !important;
+}
