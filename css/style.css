@@ -1,3 +1,8 @@
+/* css/style.css — lengkap, theme-aware, form-justified, date fixes */
+
+/* -------------------------
+   Theme tokens
+   ------------------------- */
 :root{
   --bg:#f3f4f6;
   --card:#fff;
@@ -7,9 +12,12 @@
   --gray:#6b7280;
   --input-border:#e5e7eb;
   --btn-bg:var(--accent);
+
+  /* form text tokens (defaults) */
+  --form-text: #111827;
+  --form-placeholder: #6b7280;
 }
 
-/* dark theme tokens when html has .dark */
 html.dark{
   --bg:#0b1220;
   --card:#071024;
@@ -19,15 +27,21 @@ html.dark{
   --gray:#93a2bf;
   --input-border:#243449;
   --btn-bg:var(--accent);
+
+  /* form text tokens for dark */
+  --form-text: #e6eef8;
+  --form-placeholder: #93a2bf;
 }
 
-/* reset / base */
+/* -------------------------
+   Reset / base
+   ------------------------- */
 *{box-sizing:border-box}
 body{
   font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   background:var(--bg);
   margin:0;
-  color:var(--text, #111);
+  color:var(--form-text);
   padding:18px;
   -webkit-font-smoothing:antialiased;
   -moz-osx-font-smoothing:grayscale;
@@ -40,43 +54,58 @@ body{
   box-shadow:0 1px 3px rgba(0,0,0,.06);
 }
 
-/* typography */
+/* -------------------------
+   Typography & small utilities
+   ------------------------- */
 h1{margin-top:0}
 label{font-weight:600;font-size:14px}
 .small{font-size:13px;color:var(--muted)}
 .muted{color:var(--muted)}
 
-/* basic controls */
-input,select,textarea,button{
-  padding:8px;border-radius:6px;border:1px solid var(--input-border);font-size:14px;
-  background:var(--card);color:var(--text, #111);
+/* -------------------------
+   Controls: inputs, selects, buttons
+   ------------------------- */
+input, select, textarea, button {
+  padding:8px;
+  border-radius:6px;
+  border:1px solid var(--input-border);
+  font-size:14px;
+  background:var(--card);
+  color:var(--form-text);
+  -webkit-text-fill-color: var(--form-text); /* webkit fix */
+  box-sizing: border-box;
 }
-button{cursor:pointer;background:var(--btn-bg);color:#fff;border:0;font-weight:700}
+
+button{
+  cursor:pointer;
+  background:var(--btn-bg);
+  color:#fff;
+  border:0;
+  font-weight:700;
+}
 .btn-ghost{background:#6b7280;color:#fff}
 
-/* layout helpers */
+/* -------------------------
+   Layout helpers
+   ------------------------- */
 .row{display:flex;gap:8px;align-items:center}
 .table{width:100%;border-collapse:collapse}
 .table th, .table td{padding:8px;border-bottom:1px solid var(--input-border);text-align:left}
 
-/* status pills */
+/* -------------------------
+   Status pills, toast, misc
+   ------------------------- */
 .status-pill{padding:6px 8px;border-radius:999px;font-weight:700;font-size:13px;display:inline-block}
 .pill-pending{background:#fef3c7;color:#92400e}
 .pill-in{background:#bbf7d0;color:#065f46}
 .pill-out{background:#e5e7eb;color:#374151}
-
-/* toast / message */
 .msg{padding:8px;border-radius:6px;background:#ecfccb;color:#064e3b}
-
-/* login box */
 .login-box{max-width:360px}
 
 /* -------------------------
    Form justify / alignment
-   (specific selectors to avoid overrides)
    ------------------------- */
-
-/* wrapper grid: label fixed col + inputs flexible */
+/* Use specific selectors (inside form) to avoid overrides */
 form .form-row{
   display: grid !important;
   grid-template-columns: 200px 1fr !important;
@@ -85,13 +114,11 @@ form .form-row{
   margin-bottom: 6px !important;
 }
 
-/* span entire row when needed */
 form .form-row.span-2{
   grid-column: 1 / -1 !important;
   grid-template-columns: 200px 1fr !important;
 }
 
-/* responsive: stack on small screens */
 @media (max-width: 640px){
   form .form-row{
     grid-template-columns: 1fr !important;
@@ -102,7 +129,7 @@ form .form-row.span-2{
   }
 }
 
-/* label styling */
+/* Label styling */
 form .form-row label{
   font-weight:700;
   font-size:14px;
@@ -111,7 +138,7 @@ form .form-row label{
   padding-right: 6px;
 }
 
-/* required asterisk */
+/* required asterisk after label */
 form .form-row label.required::after{
   content: " *";
   color: #ef4444;
@@ -119,7 +146,7 @@ form .form-row label.required::after{
   font-weight:700;
 }
 
-/* uniform inputs (include common classes to override utilities) */
+/* Inputs/selects/textarea uniform within form */
 form .form-row input,
 form .form-row select,
 form .form-row textarea,
@@ -132,13 +159,13 @@ form .form-row input.form-control{
   border-radius:8px !important;
   border:1px solid var(--input-border) !important;
   background:var(--card) !important;
-  color:var(--text, #111) !important;
+  color:var(--form-text) !important;
   box-sizing:border-box !important;
   font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif !important;
   transition: border-color .12s, box-shadow .12s;
 }
 
-/* focus state */
+/* Focus state */
 form .form-row input:focus,
 form .form-row select:focus,
 form .form-row textarea:focus{
@@ -147,7 +174,7 @@ form .form-row textarea:focus{
   box-shadow:0 6px 18px rgba(37,99,235,0.08) !important;
 }
 
-/* helper note under inputs (aligned to second column) */
+/* Helper note under inputs (aligned to column 2) */
 form .form-row .field-note{
   grid-column: 2 / 3;
   font-size:12px;
@@ -155,7 +182,7 @@ form .form-row .field-note{
   margin-top:4px;
 }
 
-/* actions aligned with inputs */
+/* Actions aligned with inputs */
 .form-actions{
   display: grid;
   grid-template-columns: 200px 1fr;
@@ -164,79 +191,64 @@ form .form-row .field-note{
 }
 .form-actions .actions{ justify-self: start; display:flex; gap:8px; }
 
-/* inline two-column helper (use to place two .form-row side-by-side) */
+/* Inline two-column helper */
 .inline-two{ display: grid; grid-template-columns: 1fr 1fr; gap:8px; }
 
-/* ensure hidden utility */
+/* Hidden utility */
 .hidden{ display:none !important; }
 
-/* small table spacing tweak */
+/* Card / table tweaks */
 .table th, .table td{ padding:10px 8px; }
-
-/* ensure card padding consistent with inputs */
 .card{ padding:20px; border-radius:10px; }
 
-/* ensure buttons follow theme variables */
+/* Buttons follow theme */
 button, .btn{
   background: var(--btn-bg) !important;
   color: #fff !important;
   border: 0 !important;
 }
-
-/* ghost button override */
 .btn-ghost{ background:#6b7280 !important; color:#fff !important; }
 
-/* final safety: increase specificity for any tailwind overrides */
+/* Extra specificity safety */
 body form .form-row input,
 body form .form-row select,
 body form .form-row textarea{
   border-radius:8px !important;
 }
 
-/* === Theme-aware text colours for form controls === */
-/* pastikan ini dimuat selepas semua peraturan lain supaya tidak tertindih */
-:root {
-  --form-text: #111827;
-  --form-placeholder: #6b7280;
-}
-html.dark {
-  --form-text: #e6eef8;
-  --form-placeholder: #93a2bf;
-}
-
-/* force input/select/textarea colour to theme variable */
-form .form-row input,
-form .form-row select,
-form .form-row textarea,
+/* -------------------------
+   Theme-aware form control colors (overrides)
+   ------------------------- */
+/* Force input/select/textarea color to theme tokens (applies globally as safety) */
 input, select, textarea {
   color: var(--form-text) !important;
+  background: var(--card) !important;
+  -webkit-text-fill-color: var(--form-text) !important;
+  opacity: 1 !important;
 }
 
-/* placeholder colour */
-form .form-row input::placeholder,
+/* Placeholder color */
 input::placeholder,
 textarea::placeholder {
   color: var(--form-placeholder) !important;
 }
 
-/* select dropdown option colours (some browsers need explicit) */
+/* Select / option contrast */
 form .form-row select,
 select {
   color: var(--form-text) !important;
   background: var(--card) !important;
+  -webkit-appearance: menulist-button;
+}
+option {
+  color: var(--form-text) !important;
+  background: var(--card) !important;
 }
 
-/* Safari/Chrome native dropdown arrow keep contrast */
-select { -webkit-appearance: menulist-button; }
-
-/* ensure option text visible in dropdown list */
-option { color: var(--form-text) !important; background: var(--card) !important; }
-
-/* 1) Gunakan token tema untuk teks input/placeholder */
-:root { --form-text: #111827; --form-placeholder: #6b7280; }
-html.dark { --form-text: #e6eef8; --form-placeholder: #93a2bf; }
-
-/* 2) Pastikan input date nampak teks & background di kedua tema */
+/* -------------------------
+   Date input specific fixes (WebKit/Chromium)
+   ------------------------- */
+/* Ensure displayed date text is visible in both themes */
 input[type="date"] {
   color: var(--form-text) !important;
   background: var(--card) !important;
@@ -244,13 +256,14 @@ input[type="date"] {
   min-height: 42px;
   padding: 8px 10px;
   border-radius: 8px;
-  -webkit-text-fill-color: var(--form-text) !important; /* webkit fix for some browsers */
+  -webkit-text-fill-color: var(--form-text) !important;
+  opacity: 1 !important;
 }
 
-/* placeholder / value fallback */
+/* Placeholder fallback */
 input[type="date"]::placeholder { color: var(--form-placeholder) !important; }
 
-/* 3) WebKit internal parts (Chrome, Safari) */
+/* WebKit native parts */
 input[type="date"]::-webkit-datetime-edit {
   color: var(--form-text) !important;
   background: transparent !important;
@@ -260,23 +273,18 @@ input[type="date"]::-webkit-datetime-edit-day-field,
 input[type="date"]::-webkit-datetime-edit-month-field,
 input[type="date"]::-webkit-datetime-edit-year-field {
   color: var(--form-text) !important;
+  -webkit-text-fill-color: var(--form-text) !important;
 }
 
-/* 4) Calendar picker indicator contrast */
+/* Calendar picker icon */
 input[type="date"]::-webkit-calendar-picker-indicator {
   filter: none !important;
   opacity: 1 !important;
 }
 
-/* 5) Forced contrast inside dropdown list options (affects some UAs) */
-select, input[type="date"] { color: var(--form-text) !important; background: var(--card) !important; }
-
-/* 6) If you hide native arrow and use custom icon, ensure it's visible in dark */
-.icon-date { color: var(--form-text); }
-
-/* 7) z-index for popup overlays (if custom datepicker used) */
+/* z-index for popper calendars (flatpickr, react-datepicker etc.) */
 .flatpickr-calendar, .react-datepicker-popper { z-index: 9999 !important; }
+.flatpickr-calendar, .flatpickr-day { background: var(--card) !important; color: var(--form-text) !important; }
 
-/* 8) Safety: remove accidental transparency */
-input[type="date"], input, select, textarea { opacity: 1 !important; }
-
+/* final safety: remove accidental transforms that may hide input text */
+input, select, textarea { transform: none !important; }
