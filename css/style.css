@@ -288,3 +288,65 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 /* final safety: remove accidental transforms that may hide input text */
 input, select, textarea { transform: none !important; }
+
+/* Placeholder: italic + theme-aware grey */
+:root { --form-placeholder: #6b7280; }
+html.dark { --form-placeholder: #93a2bf; }
+
+/* standard placeholder */
+input[placeholder]::placeholder,
+textarea[placeholder]::placeholder {
+  color: var(--form-placeholder) !important;
+  font-style: italic !important;
+  opacity: 1 !important;
+}
+
+/* WebKit / Blink explicit */
+input[placeholder]::-webkit-input-placeholder,
+textarea[placeholder]::-webkit-input-placeholder {
+  color: var(--form-placeholder) !important;
+  font-style: italic !important;
+}
+
+/* Firefox explicit (older) */
+input[placeholder]::-moz-placeholder,
+textarea[placeholder]::-moz-placeholder { 
+  color: var(--form-placeholder) !important;
+  font-style: italic !important;
+}
+
+/* IE / Edge explicit */
+input[placeholder]:-ms-input-placeholder,
+textarea[placeholder]:-ms-input-placeholder {
+  color: var(--form-placeholder) !important;
+  font-style: italic !important;
+}
+
+/* When input is empty (value not entered) keep the whole input styled like a placeholder */
+input[placeholder]:placeholder-shown,
+textarea[placeholder]:placeholder-shown {
+  color: var(--form-placeholder) !important;
+  font-style: italic !important;
+}
+
+/* Style the empty option in select as a visual placeholder */
+select option[value=""] {
+  color: var(--form-placeholder) !important;
+  font-style: italic !important;
+}
+
+/* If you want the select's visible text to appear italic when the empty option is selected */
+select:invalid, /* works when the select has required */
+select:not([value]) { /* defensive: not all browsers support */
+  color: var(--form-placeholder) !important;
+  font-style: italic !important;
+}
+
+/* Safety: ensure dynamically added inputs inherit styles */
+.vehicle-list input[placeholder],
+form input[placeholder],
+form textarea[placeholder] {
+  font-style: italic !important;
+  color: var(--form-placeholder) !important;
+}
+
