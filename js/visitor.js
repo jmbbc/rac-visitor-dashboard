@@ -1,9 +1,9 @@
-// js/visitor.js (module) - Inter font applied + theme toggle + full form logic
+// js/visitor.js (module) - complete, theme-aware, company disable logic, vehicle handling, Firestore submit
 import {
   collection, addDoc, serverTimestamp, Timestamp
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
-/* ---------- helpers ---------- */
+/* ---------- utilities ---------- */
 function waitForFirestore(timeout = 5000){
   return new Promise((resolve, reject) => {
     const start = Date.now();
@@ -20,6 +20,7 @@ function toast(message, ok = true) {
   el.className = `toast ${ok ? 'ok' : 'err'}`;
   el.textContent = message;
   document.body.appendChild(el);
+  // small fade in/out via CSS class toggles (CSS already in page)
   setTimeout(()=> el.classList.add('fade'), 10);
   setTimeout(()=> el.remove(), 3300);
 }
@@ -47,21 +48,37 @@ function dateFromInputDateOnly(val){
   return isNaN(dt.getTime()) ? null : dt;
 }
 
-/* ---------- dynamic vehicle ---------- */
+/* ---------- dynamic vehicle helpers ---------- */
 function createVehicleRow(value=''){
   const wrapper = document.createElement('div');
-  wrapper.className = 'flex items-center gap-2';
+  wrapper.className = 'vehicle-row';
+  wrapper.style.display = 'flex';
+  wrapper.style.gap = '8px';
+  wrapper.style.alignItems = 'center';
+  wrapper.style.marginTop = '6px';
 
   const input = document.createElement('input');
   input.type = 'text';
-  input.className = 'block w-full rounded-md px-3 py-2';
   input.placeholder = 'ABC1234';
   input.value = value;
+  input.className = 'vehicle-input';
+  input.style.flex = '1';
+  input.style.padding = '8px';
+  input.style.borderRadius = '8px';
+  input.style.border = '1px solid var(--input-border, #e5e7eb)';
+  input.style.background = 'var(--card, #fff)';
+  input.style.color = 'var(--text, #111)';
 
   const removeBtn = document.createElement('button');
   removeBtn.type = 'button';
-  removeBtn.className = 'px-3 py-2 border rounded-md text-sm';
+  removeBtn.className = 'vehicle-remove';
   removeBtn.textContent = '−';
+  removeBtn.title = 'Keluarkan baris';
+  removeBtn.style.padding = '8px 10px';
+  removeBtn.style.borderRadius = '8px';
+  removeBtn.style.border = '1px solid var(--input-border, #e5e7eb)';
+  removeBtn.style.background = 'transparent';
+  removeBtn.style.cursor = 'pointer';
   removeBtn.addEventListener('click', () => wrapper.remove());
 
   wrapper.appendChild(input);
@@ -70,7 +87,7 @@ function createVehicleRow(value=''){
 }
 
 function getVehicleNumbersFromList(){
-  const list = document.querySelectorAll('#vehicleList input');
+  const list = document.querySelectorAll('#vehicleList .vehicle-row input');
   const out = [];
   list.forEach(i => {
     const v = i.value.trim();
@@ -79,23 +96,46 @@ function getVehicleNumbersFromList(){
   return out;
 }
 
+/* ---------- company field state helper ---------- */
+const companyCategories = new Set(['Kontraktor','Penghantaran Barang','Pindah Rumah']);
+
+function setCompanyFieldState(show) {
+  const companyWrap = document.getElementById('companyWrap');
+  const companyInput = document.getElementById('companyName');
+  if (!companyWrap || !companyInput) return;
+  if (show) {
+    companyWrap.classList.remove('hidden');
+    companyInput.required = true;
+    companyInput.disabled = false;
+    companyInput.removeAttribute('aria-hidden');
+  } else {
+    companyWrap.classList.add('hidden');
+    companyInput.required = false;
+    companyInput.disabled = true;
+    companyInput.value = '';
+    companyInput.setAttribute('aria-hidden','true');
+  }
+}
+
 /* ---------- theme handling ---------- */
 function applyTheme(theme){
   if (theme === 'light') {
     document.documentElement.classList.remove('dark');
-    document.getElementById('themeToggle').textContent = 'Dark';
+    const tBtn = document.getElementById('themeToggle');
+    if (tBtn) tBtn.textContent = 'Dark';
   } else {
     document.documentElement.classList.add('dark');
-    document.getElementById('themeToggle').textContent = 'Light';
+    const tBtn = document.getElementById('themeToggle');
+    if (tBtn) tBtn.textContent = 'Light';
   }
-  localStorage.setItem('visitorTheme', theme);
+  try { localStorage.setItem('visitorTheme', theme); } catch(e){}
 }
 
-/* ---------- main ---------- */
+/* ---------- main init ---------- */
 document.addEventListener('DOMContentLoaded', () => {
-  // theme init
-  const saved = localStorage.getItem('visitorTheme') || 'dark';
-  applyTheme(saved);
+  // theme init (run immediately so CSS variables apply before render)
+  const savedTheme = (localStorage.getItem('visitorTheme') || 'dark');
+  applyTheme(savedTheme);
   document.getElementById('themeToggle')?.addEventListener('click', () => {
     const cur = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
     const next = cur === 'dark' ? 'light' : 'dark';
@@ -111,7 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // form elements
+    // elements
     const form = document.getElementById('visitorForm');
     const clearBtn = document.getElementById('clearBtn');
     const categoryEl = document.getElementById('category');
@@ -129,31 +169,43 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!form) { console.error('visitorForm missing'); return; }
 
-    // initial UI
+    // ensure initial UI state
     if (stayOverEl) stayOverEl.disabled = true;
-    if (companyWrap) companyWrap.classList.add('hidden');
+    if (companyWrap && companyInput) {
+      companyWrap.classList.add('hidden');
+      companyInput.disabled = true;
+      companyInput.setAttribute('aria-hidden','true');
+    }
     if (vehicleMultiWrap) vehicleMultiWrap.classList.add('hidden');
     if (vehicleSingleWrap) vehicleSingleWrap.classList.remove('hidden');
+    if (vehicleList) vehicleList.innerHTML = '';
 
-    const companyCategories = new Set(['Kontraktor','Penghantaran Barang','Pindah Rumah']);
+    // Category change handler
+    categoryEl?.addEventListener('change', (ev) => {
+      const v = ev.target.value?.trim();
 
-    // category change
-    categoryEl?.addEventListener('change', () => {
-      const v = categoryEl.value;
+      // stayOver for Pelawat
       if (stayOverEl) {
-        if (v === 'Pelawat') { stayOverEl.disabled = false; if (!stayOverEl.value) stayOverEl.value = 'No'; }
-        else { stayOverEl.value = 'No'; stayOverEl.disabled = true; }
+        if (v === 'Pelawat') {
+          stayOverEl.disabled = false;
+          if (!stayOverEl.value) stayOverEl.value = 'No';
+        } else {
+          stayOverEl.value = 'No';
+          stayOverEl.disabled = true;
+        }
       }
 
-      if (companyWrap && companyInput) {
-        if (companyCategories.has(v)) { companyWrap.classList.remove('hidden'); companyInput.required = true; }
-        else { companyWrap.classList.add('hidden'); companyInput.required = false; companyInput.value = ''; }
-      }
+      // companyName show/disable
+      setCompanyFieldState(companyCategories.has(v));
 
+      // vehicle switch
       if (v === 'Pelawat Khas') {
         vehicleSingleWrap?.classList.add('hidden');
         vehicleMultiWrap?.classList.remove('hidden');
-        if (vehicleList && !vehicleList.querySelector('div')) vehicleList.appendChild(createVehicleRow(''));
+        if (vehicleList && !vehicleList.querySelector('.vehicle-row')) {
+          vehicleList.innerHTML = '';
+          vehicleList.appendChild(createVehicleRow(''));
+        }
       } else {
         vehicleSingleWrap?.classList.remove('hidden');
         vehicleMultiWrap?.classList.add('hidden');
@@ -161,13 +213,19 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
-    // add vehicle
-    addVehicleBtn?.addEventListener('click', () => vehicleList.appendChild(createVehicleRow('')));
+    // in case addVehicleBtn exists (note: in our HTML earlier it may not exist; safe-check)
+    addVehicleBtn?.addEventListener('click', () => {
+      if (!vehicleList) return;
+      vehicleList.appendChild(createVehicleRow(''));
+    });
 
     // ETA -> ETD constraints
     etaEl?.addEventListener('change', () => {
       const etaVal = etaEl.value;
-      if (!etaVal) { if (etdEl) { etdEl.value = ''; etdEl.min = ''; etdEl.max = ''; } return; }
+      if (!etaVal) {
+        if (etdEl) { etdEl.value = ''; etdEl.min = ''; etdEl.max = ''; }
+        return;
+      }
       const etaDate = dateFromInputDateOnly(etaVal);
       if (!etaDate) return;
       const maxDate = new Date(etaDate); maxDate.setDate(maxDate.getDate() + 3);
@@ -182,11 +240,25 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
+    // initialize company/vehicle state based on current category (if form populated)
+    const initCat = categoryEl?.value?.trim() || '';
+    setCompanyFieldState(companyCategories.has(initCat));
+    if (initCat === 'Pelawat Khas') {
+      vehicleSingleWrap?.classList.add('hidden');
+      vehicleMultiWrap?.classList.remove('hidden');
+      if (vehicleList && !vehicleList.querySelector('.vehicle-row')) vehicleList.appendChild(createVehicleRow(''));
+    } else {
+      vehicleSingleWrap?.classList.remove('hidden');
+      vehicleMultiWrap?.classList.add('hidden');
+      if (vehicleList) vehicleList.innerHTML = '';
+    }
+
     // submit
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       showStatus('Memproses...', true);
 
+      // gather
       const hostUnit = document.getElementById('hostUnit')?.value.trim() || '';
       const hostName = document.getElementById('hostName')?.value.trim() || '';
       const hostPhone = document.getElementById('hostPhone')?.value.trim() || '';
@@ -201,6 +273,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const etdVal = document.getElementById('etd')?.value || '';
       const vehicleType = document.getElementById('vehicleType')?.value || '';
 
+      // validation
       if (!hostUnit || !hostName) { showStatus('Sila lengkapkan Butiran Penghuni (Unit & Nama).', false); toast('Sila lengkapkan Unit & Nama penghuni', false); return; }
       if (!category) { showStatus('Sila pilih Kategori.', false); toast('Sila pilih kategori', false); return; }
       if (companyCategories.has(category) && !companyName) { showStatus('Sila masukkan Nama syarikat.', false); toast('Sila masukkan Nama syarikat', false); return; }
@@ -213,17 +286,22 @@ document.addEventListener('DOMContentLoaded', () => {
       const etdDate = etdVal ? dateFromInputDateOnly(etdVal) : null;
       if (!etaDate) { showStatus('Tarikh ETA tidak sah.', false); toast('Tarikh ETA tidak sah', false); return; }
       if (etdVal && !etdDate) { showStatus('Tarikh ETD tidak sah.', false); toast('Tarikh ETD tidak sah', false); return; }
-      if (etdDate) { const max = new Date(etaDate); max.setDate(max.getDate() + 3); if (etdDate < etaDate || etdDate > max) { showStatus('Tarikh ETD mesti antara ETA hingga 3 hari selepas ETA.', false); toast('Tarikh ETD luar julat', false); return; } }
+      if (etdDate) {
+        const max = new Date(etaDate); max.setDate(max.getDate() + 3);
+        if (etdDate < etaDate || etdDate > max) { showStatus('Tarikh ETD mesti antara ETA hingga 3 hari selepas ETA.', false); toast('Tarikh ETD mesti antara ETA hingga 3 hari selepas ETA', false); return; }
+      }
 
+      // vehicle handling
       let vehicleNo = '';
       let vehicleNumbers = [];
       if (category === 'Pelawat Khas') {
         vehicleNumbers = getVehicleNumbersFromList();
-        if (!vehicleNumbers.length) { showStatus('Sila masukkan sekurang-kurangnya satu nombor kenderaan.', false); toast('Sila masukkan nombor kenderaan', false); return; }
+        if (!vehicleNumbers.length) { showStatus('Sila masukkan sekurang-kurangnya satu nombor kenderaan untuk Pelawat Khas.', false); toast('Sila masukkan nombor kenderaan', false); return; }
       } else {
         vehicleNo = document.getElementById('vehicleNo')?.value.trim() || '';
       }
 
+      // prepare payload
       const payload = {
         hostUnit,
         hostName,
@@ -250,7 +328,8 @@ document.addEventListener('DOMContentLoaded', () => {
         showStatus('Pendaftaran berjaya. Terima kasih.', true);
         toast('Pendaftaran berjaya', true);
         form.reset();
-        if (companyWrap) companyWrap.classList.add('hidden');
+        // reset UI bits
+        setCompanyFieldState(false);
         if (vehicleMultiWrap) vehicleMultiWrap.classList.add('hidden');
         if (vehicleSingleWrap) vehicleSingleWrap.classList.remove('hidden');
         if (vehicleList) vehicleList.innerHTML = '';
@@ -267,7 +346,7 @@ document.addEventListener('DOMContentLoaded', () => {
     clearBtn?.addEventListener('click', () => {
       form.reset();
       showStatus('', true);
-      if (companyWrap) companyWrap.classList.add('hidden');
+      setCompanyFieldState(false);
       if (vehicleMultiWrap) vehicleMultiWrap.classList.add('hidden');
       if (vehicleSingleWrap) vehicleSingleWrap.classList.remove('hidden');
       if (vehicleList) vehicleList.innerHTML = '';
