@@ -350,3 +350,14 @@ form textarea[placeholder] {
   color: var(--form-placeholder) !important;
 }
 
+/* Mobile stacking helper: gunakan pada .form-row untuk jadikan label di atas input pada saiz kecil */
+@media (max-width: 640px) {
+  form .form-row.stack-mobile {
+    grid-template-columns: 1fr !important;
+  }
+  form .form-row.stack-mobile label {
+    justify-self: start !important;
+    margin-bottom: 6px !important;
+  }
+}
+
