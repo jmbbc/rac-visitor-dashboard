@@ -1,4 +1,4 @@
-// js/visitor.js (module) - dikemas kini untuk behaviour yang anda minta
+// js/visitor.js - dikemas kini: ETD disabled untuk Kontraktor/Penghantaran Barang/Pindah Rumah
 import {
   collection, addDoc, serverTimestamp, Timestamp
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
@@ -96,6 +96,9 @@ function getVehicleNumbersFromList(){
 /* ---------- company field state helper ---------- */
 const companyCategories = new Set(['Kontraktor','Penghantaran Barang','Pindah Rumah']);
 
+/* categories where ETD must be disabled entirely */
+const categoriesEtdDisabled = new Set(['Kontraktor','Penghantaran Barang','Pindah Rumah']);
+
 function setCompanyFieldState(show) {
   const companyWrap = document.getElementById('companyWrap');
   const companyInput = document.getElementById('companyName');
@@ -181,10 +184,8 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
         vehicleSingleWrap.classList.remove('hidden');
         vehicleMultiWrap.classList.add('hidden');
-        // disable/hide the add button when not Pelawat Khas
         addVehicleBtn.disabled = true;
         addVehicleBtn.classList.add('btn-disabled');
-        // clear list to avoid duplicates
         vehicleList && (vehicleList.innerHTML = '');
       }
     }
@@ -192,12 +193,21 @@ document.addEventListener('DOMContentLoaded', () => {
     // helper: update ETD enabled/disabled based on category and stayOver
     function updateEtdState(cat) {
       if (!etdEl || !etaEl) return;
+
+      // If category explicitly disallows ETD
+      if (categoriesEtdDisabled.has(cat)) {
+        etdEl.disabled = true;
+        etdEl.value = '';
+        etdEl.min = '';
+        etdEl.max = '';
+        return;
+      }
+
+      // For Pelawat: only when stayOver == 'Yes'
       if (cat === 'Pelawat') {
-        // for Pelawat, ETD only available if stayOver == 'Yes'
         const stay = stayOverEl?.value || 'No';
         if (stay === 'Yes') {
           etdEl.disabled = false;
-          // set min/max according to eta if available
           const etaVal = etaEl.value;
           if (etaVal) {
             const etaDate = dateFromInputDateOnly(etaVal);
@@ -214,26 +224,27 @@ document.addEventListener('DOMContentLoaded', () => {
           etdEl.min = '';
           etdEl.max = '';
         }
-      } else {
-        // other categories: ETD permitted, but still constrained by ETA when set
-        etdEl.disabled = false;
-        const etaVal = etaEl.value;
-        if (etaVal) {
-          const etaDate = dateFromInputDateOnly(etaVal);
-          if (etaDate) {
-            const maxDate = new Date(etaDate); maxDate.setDate(maxDate.getDate() + 3);
-            const toIso = d => d.toISOString().slice(0,10);
-            etdEl.min = toIso(etaDate);
-            etdEl.max = toIso(maxDate);
-            if (etdEl.value) {
-              const cur = dateFromInputDateOnly(etdEl.value);
-              if (!cur || cur < etaDate || cur > maxDate) etdEl.value = '';
-            }
+        return;
+      }
+
+      // For Pelawat Khas or other categories not in categoriesEtdDisabled: enable ETD (constrained by ETA)
+      etdEl.disabled = false;
+      const etaVal = etaEl.value;
+      if (etaVal) {
+        const etaDate = dateFromInputDateOnly(etaVal);
+        if (etaDate) {
+          const maxDate = new Date(etaDate); maxDate.setDate(maxDate.getDate() + 3);
+          const toIso = d => d.toISOString().slice(0,10);
+          etdEl.min = toIso(etaDate);
+          etdEl.max = toIso(maxDate);
+          if (etdEl.value) {
+            const cur = dateFromInputDateOnly(etdEl.value);
+            if (!cur || cur < etaDate || cur > maxDate) etdEl.value = '';
           }
-        } else {
-          etdEl.min = '';
-          etdEl.max = '';
         }
+      } else {
+        etdEl.min = '';
+        etdEl.max = '';
       }
     }
 
@@ -304,17 +315,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (etdEl) {
         etdEl.min = toIso(etaDate);
         etdEl.max = toIso(maxDate);
-        // if ETD currently disabled by category/stayOver rules, keep it cleared
+        // ensure ETD still obeys category rules
         const cat = categoryEl?.value?.trim() || '';
-        if (cat === 'Pelawat') {
-          // will be set/cleared by updateEtdState
-          updateEtdState(cat);
-        } else {
-          if (etdEl.value) {
-            const cur = dateFromInputDateOnly(etdEl.value);
-            if (!cur || cur < etaDate || cur > maxDate) etdEl.value = '';
-          }
-        }
+        updateEtdState(cat);
       }
     });
 
