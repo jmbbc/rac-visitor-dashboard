@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Borang Daftar Pelawat — Banjaria Court</title>
+  <title>Borang Daftar Pelawat — RAC</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -51,6 +51,12 @@
         <input id="entryDetails" name="entryDetails" placeholder="Contoh: Servis penghawa dingin / Hantar barang" />
       </div>
 
+      <!-- Nama syarikat: hanya aktif untuk beberapa kategori -->
+      <div id="companyWrap" class="col-span-2" style="display:none">
+        <label for="companyName">Nama syarikat</label>
+        <input id="companyName" name="companyName" placeholder="Nama syarikat (aktif untuk kontraktor / penghantaran / pindah)" />
+      </div>
+
       <div class="col-span-2">
         <label for="visitorName">Nama pelawat *</label>
         <input id="visitorName" name="visitorName" required placeholder="Nama pelawat" />
@@ -84,13 +90,11 @@
       <!-- Bahagian 3: Butiran Kenderaan -->
       <h3 style="grid-column:1/-1;margin:0;font-size:16px;margin-top:6px">Bahagian 3 — Butiran Kenderaan</h3>
 
-      <!-- single vehicle input (default shown for non-Pelawat Khas) -->
       <div id="vehicleSingleWrap">
         <label for="vehicleNo">Nombor kenderaan</label>
         <input id="vehicleNo" name="vehicleNo" placeholder="ABC1234" />
       </div>
 
-      <!-- dynamic vehicle inputs for Pelawat Khas (hidden by default) -->
       <div id="vehicleMultiWrap" style="display:none;grid-column:1/-1">
         <label>Nombor kenderaan (boleh tambah lebih dari 1)</label>
         <div id="vehicleList"></div>
