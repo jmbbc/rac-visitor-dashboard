@@ -1,4 +1,4 @@
-// js/visitor.js - dikemas kini: ETD disabled untuk Kontraktor/Penghantaran Barang/Pindah Rumah
+// js/visitor.js - lengkap, termasuk subCategory (Masuk/Keluar), ETD rules, vehicle multi, company logic
 import {
   collection, addDoc, serverTimestamp, Timestamp
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
@@ -76,6 +76,7 @@ function createVehicleRow(value=''){
   removeBtn.style.padding = '8px 10px';
   removeBtn.style.borderRadius = '8px';
   removeBtn.style.cursor = 'pointer';
+  removeBtn.setAttribute('aria-label','Keluarkan nombor kenderaan');
   removeBtn.addEventListener('click', () => wrapper.remove());
 
   wrapper.appendChild(input);
@@ -93,11 +94,21 @@ function getVehicleNumbersFromList(){
   return out;
 }
 
-/* ---------- company field state helper ---------- */
+/* ---------- category / subcategory / company logic ---------- */
 const companyCategories = new Set(['Kontraktor','Penghantaran Barang','Pindah Rumah']);
-
-/* categories where ETD must be disabled entirely */
 const categoriesEtdDisabled = new Set(['Kontraktor','Penghantaran Barang','Pindah Rumah']);
+
+// subcategory map for specific categories
+const subCategoryMap = {
+  'Penghantaran Barang': [
+    { value: 'Penghantaran Masuk', label: 'Penghantaran Masuk' },
+    { value: 'Penghantaran Keluar', label: 'Penghantaran Keluar' }
+  ],
+  'Pindah Rumah': [
+    { value: 'Pindah Masuk', label: 'Pindah Masuk' },
+    { value: 'Pindah Keluar', label: 'Pindah Keluar' }
+  ]
+};
 
 function setCompanyFieldState(show) {
   const companyWrap = document.getElementById('companyWrap');
@@ -117,6 +128,31 @@ function setCompanyFieldState(show) {
   }
 }
 
+function updateSubCategoryForCategory(cat) {
+  const wrap = document.getElementById('subCategoryWrap');
+  const select = document.getElementById('subCategory');
+  if (!wrap || !select) return;
+  // reset
+  select.innerHTML = '<option value="">— Pilih —</option>';
+  select.required = false;
+  select.disabled = true;
+  wrap.classList.add('hidden');
+  wrap.setAttribute('aria-hidden','true');
+
+  if (subCategoryMap[cat]) {
+    subCategoryMap[cat].forEach(opt => {
+      const o = document.createElement('option');
+      o.value = opt.value;
+      o.textContent = opt.label;
+      select.appendChild(o);
+    });
+    wrap.classList.remove('hidden');
+    wrap.removeAttribute('aria-hidden');
+    select.disabled = false;
+    select.required = true;
+  }
+}
+
 /* ---------- theme handling ---------- */
 function applyTheme(theme){
   if (theme === 'light') {
@@ -133,7 +169,6 @@ function applyTheme(theme){
 
 /* ---------- main init ---------- */
 document.addEventListener('DOMContentLoaded', () => {
-  // theme init
   const savedTheme = (localStorage.getItem('visitorTheme') || 'dark');
   applyTheme(savedTheme);
   document.getElementById('themeToggle')?.addEventListener('click', () => {
@@ -155,6 +190,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('visitorForm');
     const clearBtn = document.getElementById('clearBtn');
     const categoryEl = document.getElementById('category');
+    const subCategoryEl = document.getElementById('subCategory');
     const stayOverEl = document.getElementById('stayOver');
     const etaEl = document.getElementById('eta');
     const etdEl = document.getElementById('etd');
@@ -194,7 +230,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateEtdState(cat) {
       if (!etdEl || !etaEl) return;
 
-      // If category explicitly disallows ETD
+      // explicit disallow categories
       if (categoriesEtdDisabled.has(cat)) {
         etdEl.disabled = true;
         etdEl.value = '';
@@ -227,7 +263,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      // For Pelawat Khas or other categories not in categoriesEtdDisabled: enable ETD (constrained by ETA)
+      // Other allowed categories (including Pelawat Khas): enable ETD constrained by ETA
       etdEl.disabled = false;
       const etaVal = etaEl.value;
       if (etaVal) {
@@ -267,6 +303,9 @@ document.addEventListener('DOMContentLoaded', () => {
     categoryEl?.addEventListener('change', (ev) => {
       const v = ev.target.value?.trim();
 
+      // update subcategory (Penghantaran / Pindah options)
+      updateSubCategoryForCategory(v);
+
       // stayOver for Pelawat: enable the control but default to No
       if (stayOverEl) {
         if (v === 'Pelawat') {
@@ -286,6 +325,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // ETD state update based on new category & stayOver
       updateEtdState(v);
+    });
+
+    // subCategory change: nothing special by default, but kept for future hooks
+    subCategoryEl?.addEventListener('change', () => {
+      // reserved for future logic if needed
     });
 
     // stayOver change handler: only relevant when category == Pelawat
@@ -321,9 +365,10 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
-    // initialize company/vehicle/etd state based on current category (if form populated)
+    // initialize company/vehicle/subcategory/etd state based on current category (if form populated)
     const initCat = categoryEl?.value?.trim() || '';
     setCompanyFieldState(companyCategories.has(initCat));
+    updateSubCategoryForCategory(initCat);
     updateVehicleControlsForCategory(initCat);
     updateEtdState(initCat);
 
@@ -338,6 +383,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const hostPhone = document.getElementById('hostPhone')?.value.trim() || '';
 
       const category = categoryEl?.value || '';
+      const subCategory = subCategoryEl?.value || '';
       const entryDetails = document.getElementById('entryDetails')?.value.trim() || '';
       const companyName = document.getElementById('companyName')?.value.trim() || '';
       const visitorName = document.getElementById('visitorName')?.value.trim() || '';
@@ -350,6 +396,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // validation
       if (!hostUnit || !hostName) { showStatus('Sila lengkapkan Butiran Penghuni (Unit & Nama).', false); toast('Sila lengkapkan Unit & Nama penghuni', false); return; }
       if (!category) { showStatus('Sila pilih Kategori.', false); toast('Sila pilih kategori', false); return; }
+      if (subCategoryMap[category] && !subCategory) { showStatus('Sila pilih pilihan bagi kategori ini.', false); toast('Sila pilih pilihan bagi kategori ini', false); return; }
       if (companyCategories.has(category) && !companyName) { showStatus('Sila masukkan Nama syarikat.', false); toast('Sila masukkan Nama syarikat', false); return; }
       if (!visitorName) { showStatus('Sila masukkan Nama Pelawat.', false); toast('Sila masukkan Nama Pelawat', false); return; }
       if (!etaVal) { showStatus('Sila pilih Tarikh ETA.', false); toast('Sila pilih ETA', false); return; }
@@ -381,6 +428,7 @@ document.addEventListener('DOMContentLoaded', () => {
         hostName,
         hostPhone: hostPhone || '',
         category,
+        subCategory,
         entryDetails: entryDetails || '',
         companyName: companyName || '',
         visitorName,
@@ -404,6 +452,7 @@ document.addEventListener('DOMContentLoaded', () => {
         form.reset();
         // reset UI bits
         setCompanyFieldState(false);
+        updateSubCategoryForCategory('');
         if (vehicleMultiWrap) vehicleMultiWrap.classList.add('hidden');
         if (vehicleSingleWrap) vehicleSingleWrap.classList.remove('hidden');
         if (vehicleList) vehicleList.innerHTML = '';
@@ -422,6 +471,7 @@ document.addEventListener('DOMContentLoaded', () => {
       form.reset();
       showStatus('', true);
       setCompanyFieldState(false);
+      updateSubCategoryForCategory('');
       if (vehicleMultiWrap) vehicleMultiWrap.classList.add('hidden');
       if (vehicleSingleWrap) vehicleSingleWrap.classList.remove('hidden');
       if (vehicleList) vehicleList.innerHTML = '';
