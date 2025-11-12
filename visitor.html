@@ -26,6 +26,7 @@
 
         <div style="display:flex;gap:8px;align-items:center">
           <label for="themeToggle" class="small muted">Tema</label>
+          <!-- HTML mula dengan dark, jadi teks butang tunjuk "Light" (JS akan toggle) -->
           <button id="themeToggle" style="padding:6px 10px;border-radius:6px;border:1px solid var(--input-border);background:var(--card);font-weight:600">Light</button>
         </div>
       </header>
@@ -74,8 +75,8 @@
         </div>
 
         <div id="companyWrap" class="form-row span-2 hidden">
-          <label for="companyName" class="">Nama syarikat</label>
-          <input id="companyName" name="companyName" placeholder="Nama syarikat" />
+          <label for="companyName">Nama syarikat</label>
+          <input id="companyName" name="companyName" placeholder="Nama syarikat" disabled aria-hidden="true" />
         </div>
 
         <div class="form-row span-2">
@@ -103,7 +104,7 @@
 
         <div class="form-row">
           <label for="etd">Tarikh ETD</label>
-          <input id="etd" name="etd" type="date" />
+          <input id="etd" name="etd" type="date" disabled />
           <div class="field-note">ETD boleh dipilih sehingga 3 hari selepas ETA</div>
         </div>
 
@@ -120,9 +121,9 @@
         <div id="vehicleMultiWrap" class="form-row span-2 hidden">
           <label for="vehicleList">Nombor kenderaan</label>
           <div>
-            <div id="vehicleList" class="vehicle-list"></div>
+            <div id="vehicleList" class="vehicle-list" role="list"></div>
             <div style="margin-top:8px; display:flex; gap:8px; align-items:center;">
-              <button type="button" id="addVehicleBtn" class="btn-ghost" style="padding:6px 10px;border-radius:8px;">+ Tambah Nombor Kenderaan</button>
+              <button type="button" id="addVehicleBtn" class="btn-ghost" disabled style="padding:6px 10px;border-radius:8px;">+ Tambah Nombor Kenderaan</button>
               <span class="field-note" style="margin-left:8px; font-size:12px; color:var(--muted);">Tekan + untuk tambah baris; gunakan − untuk keluarkan baris.</span>
             </div>
           </div>
