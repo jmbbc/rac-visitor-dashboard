@@ -192,3 +192,42 @@ body form .form-row select,
 body form .form-row textarea{
   border-radius:8px !important;
 }
+
+/* === Theme-aware text colours for form controls === */
+/* pastikan ini dimuat selepas semua peraturan lain supaya tidak tertindih */
+:root {
+  --form-text: #111827;
+  --form-placeholder: #6b7280;
+}
+html.dark {
+  --form-text: #e6eef8;
+  --form-placeholder: #93a2bf;
+}
+
+/* force input/select/textarea colour to theme variable */
+form .form-row input,
+form .form-row select,
+form .form-row textarea,
+input, select, textarea {
+  color: var(--form-text) !important;
+}
+
+/* placeholder colour */
+form .form-row input::placeholder,
+input::placeholder,
+textarea::placeholder {
+  color: var(--form-placeholder) !important;
+}
+
+/* select dropdown option colours (some browsers need explicit) */
+form .form-row select,
+select {
+  color: var(--form-text) !important;
+  background: var(--card) !important;
+}
+
+/* Safari/Chrome native dropdown arrow keep contrast */
+select { -webkit-appearance: menulist-button; }
+
+/* ensure option text visible in dropdown list */
+option { color: var(--form-text) !important; background: var(--card) !important; }
