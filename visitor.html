@@ -3,208 +3,144 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Borang Daftar Pelawat — RAC</title>
+  <title>Borang Daftar Pelawat — Banjaria Court</title>
 
-  <!-- Inter font (Google Fonts) -->
+  <!-- Inter font -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
 
-  <!-- Tailwind v1 CDN -->
+  <!-- Tailwind v1 (optional, keeps previous utilities) -->
   <script src="https://v1.tailwindcss.com"></script>
 
-  <style>
-    /* Font variable and theme tokens */
-    :root {
-      --ui-font: 'Inter', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-      --bg: #ffffff;
-      --card: #ffffff;
-      --text: #0f172a;
-      --muted: #6b7280;
-      --primary: #4f46e5;
-      --input-bg: #ffffff;
-      --input-border: #d1d5db;
-    }
-    html.dark {
-      --bg: #0b1220;
-      --card: #071024;
-      --text: #e6eef8;
-      --muted: #93a2bf;
-      --primary: #7c3aed;
-      --input-bg: #061226;
-      --input-border: #243449;
-    }
-
-    /* Base */
-    html, body { height: 100%; }
-    body {
-      margin: 0;
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--ui-font);
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-      line-height: 1.4;
-    }
-
-    /* Card & inputs */
-    .card-surface { background: var(--card); border-radius: 12px; border: 1px solid rgba(255,255,255,0.03); }
-    .muted { color: var(--muted); }
-    .btn-primary { background: var(--primary); color: white; }
-    input, select, textarea, button {
-      font-family: var(--ui-font);
-      background: var(--input-bg);
-      border: 1px solid var(--input-border);
-      color: var(--text);
-    }
-
-    /* toast */
-    .toast {
-      position: fixed; right: 16px; top: 16px; z-index: 60; padding: 10px 14px; border-radius: 8px;
-      box-shadow: 0 6px 18px rgba(2,6,23,0.6); font-weight: 600;
-    }
-    .toast.ok { background: #052e16; color: #bbf7d0; }
-    .toast.err { background: #3b0b0b; color: #fee2e2; }
-
-    /* conflict highlight */
-    tr.conflict { background-color: rgba(255, 59, 48, 0.06); }
-
-    /* small helpers */
-    .hidden { display: none !important; }
-    .rounded-md { border-radius: 8px; }
-  </style>
+  <!-- main site CSS (pastikan style/style.css mengandungi rules sebelumnya + .form-row tambahan) -->
+  <link rel="stylesheet" href="style/style.css">
 </head>
-<body class="antialiased">
-  <main class="max-w-3xl mx-auto p-6">
-    <header class="flex items-center justify-between mb-6">
-      <div>
-        <a href="index.html" class="text-sm muted hover:underline">← Kembali</a>
-        <h1 class="text-2xl font-semibold mt-2">Borang Daftar Pelawat</h1>
-        <p class="text-sm muted mt-1">Sila lengkapkan maklumat. Medan bertanda <span class="text-red-500 font-semibold">*</span> wajib diisi.</p>
-      </div>
-
-      <div class="flex items-center gap-3">
-        <label for="themeToggle" class="text-sm muted">Tema</label>
-        <button id="themeToggle" class="px-3 py-2 border rounded-md text-sm" title="Tukar tema">Light</button>
-      </div>
-    </header>
-
-    <section id="formCard" class="card-surface shadow-sm p-6">
-      <form id="visitorForm" class="space-y-6" autocomplete="off" novalidate>
-        <!-- Bahagian 1 -->
+<body>
+  <main class="container">
+    <section class="card">
+      <header style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
         <div>
-          <h2 class="text-lg font-medium">Bahagian 1 — Butiran Penghuni</h2>
-          <div class="mt-4 grid gap-4 grid-cols-1 md:grid-cols-2">
-            <div>
-              <label for="hostUnit" class="block text-sm font-medium">Unit rumah <span class="text-red-500">*</span></label>
-              <input id="hostUnit" name="hostUnit" required placeholder="Contoh: A-12-03" class="mt-1 block w-full rounded-md px-3 py-2" />
-            </div>
-            <div>
-              <label for="hostName" class="block text-sm font-medium">Nama penghuni <span class="text-red-500">*</span></label>
-              <input id="hostName" name="hostName" required placeholder="Nama penghuni" class="mt-1 block w-full rounded-md px-3 py-2" />
-            </div>
-            <div class="md:col-span-2">
-              <label for="hostPhone" class="block text-sm font-medium">Nombor telefon penghuni</label>
-              <input id="hostPhone" name="hostPhone" type="tel" inputmode="tel" placeholder="012-3456789" class="mt-1 block w-full rounded-md px-3 py-2" />
-            </div>
+          <a href="index.html" class="small">← Kembali ke Banjaria Court</a>
+          <h1 style="margin:6px 0 0 0">Borang Daftar Pelawat — Banjaria Court</h1>
+          <p class="small" style="margin:6px 0 0 0">Sila lengkapkan maklumat. Medan bertanda <span style="color:#ef4444;font-weight:700">*</span> wajib diisi.</p>
+        </div>
+
+        <div style="display:flex;gap:8px;align-items:center">
+          <label for="themeToggle" class="small muted">Tema</label>
+          <button id="themeToggle" style="padding:6px 10px;border-radius:6px;border:1px solid #e5e7eb;background:#fff;font-weight:600">Light</button>
+        </div>
+      </header>
+
+      <form id="visitorForm" autocomplete="off" novalidate>
+        <!-- Bahagian 1 -->
+        <h3 style="margin:0 0 8px 0">Bahagian 1 — Butiran Penghuni</h3>
+
+        <div class="inline-two">
+          <div class="form-row">
+            <label for="hostUnit" class="required">Unit rumah</label>
+            <input id="hostUnit" name="hostUnit" required placeholder="Contoh: A-12-03" />
+          </div>
+
+          <div class="form-row">
+            <label for="hostName" class="required">Nama penghuni</label>
+            <input id="hostName" name="hostName" required placeholder="Nama penghuni" />
           </div>
         </div>
 
-        <hr class="border-t border-gray-200/40" />
+        <div class="form-row span-2">
+          <label for="hostPhone">Nombor telefon penghuni</label>
+          <input id="hostPhone" name="hostPhone" type="tel" inputmode="tel" placeholder="012-3456789" />
+        </div>
+
+        <hr style="border:none;border-top:1px solid #e5e7eb;margin:12px 0" />
 
         <!-- Bahagian 2 -->
-        <div>
-          <h2 class="text-lg font-medium">Bahagian 2 — Butiran Kemasukkan</h2>
-          <div class="mt-4 grid gap-4 grid-cols-1 md:grid-cols-2">
-            <div>
-              <label for="category" class="block text-sm font-medium">Kategori <span class="text-red-500">*</span></label>
-              <select id="category" name="category" required class="mt-1 block w-full rounded-md px-3 py-2">
-                <option value="">— Pilih —</option>
-                <option value="Pelawat">Pelawat</option>
-                <option value="Kontraktor">Kontraktor</option>
-                <option value="Penghantaran Barang">Penghantaran Barang</option>
-                <option value="Pindah Rumah">Pindah Rumah</option>
-                <option value="Pelawat Khas">Pelawat Khas</option>
-              </select>
-            </div>
+        <h3 style="margin:0 0 8px 0">Bahagian 2 — Butiran Kemasukkan</h3>
 
-            <div class="md:col-span-2">
-              <label for="entryDetails" class="block text-sm font-medium">Butiran kemasukkan</label>
-              <input id="entryDetails" name="entryDetails" placeholder="Contoh: Servis penghawa dingin / Hantar barang" class="mt-1 block w-full rounded-md px-3 py-2" />
-            </div>
-
-            <div id="companyWrap" class="md:col-span-2 hidden">
-              <label for="companyName" class="block text-sm font-medium">Nama syarikat</label>
-              <input id="companyName" name="companyName" placeholder="Nama syarikat" class="mt-1 block w-full rounded-md px-3 py-2" />
-            </div>
-
-            <div class="md:col-span-2">
-              <label for="visitorName" class="block text-sm font-medium">Nama pelawat <span class="text-red-500">*</span></label>
-              <input id="visitorName" name="visitorName" required placeholder="Contoh: Ahmad bin Ali" class="mt-1 block w-full rounded-md px-3 py-2" />
-            </div>
-
-            <div>
-              <label for="visitorPhone" class="block text-sm font-medium">Nombor telefon pelawat</label>
-              <input id="visitorPhone" name="visitorPhone" type="tel" inputmode="tel" placeholder="012-3456789" class="mt-1 block w-full rounded-md px-3 py-2" />
-            </div>
-
-            <div>
-              <label for="stayOver" class="block text-sm font-medium">Bermalam?</label>
-              <select id="stayOver" name="stayOver" disabled class="mt-1 block w-full rounded-md px-3 py-2">
-                <option value="No">Tidak Bermalam</option>
-                <option value="Yes">Bermalam</option>
-              </select>
-              <p id="stayHint" class="text-xs muted mt-1">Pilihan ini aktif jika kategori = Pelawat</p>
-            </div>
-
-            <div>
-              <label for="eta" class="block text-sm font-medium">Tarikh ETA <span class="text-red-500">*</span></label>
-              <input id="eta" name="eta" type="date" required class="mt-1 block w-full rounded-md px-3 py-2" />
-            </div>
-
-            <div>
-              <label for="etd" class="block text-sm font-medium">Tarikh ETD</label>
-              <input id="etd" name="etd" type="date" class="mt-1 block w-full rounded-md px-3 py-2" />
-              <p id="etdHint" class="text-xs muted mt-1">ETD boleh dipilih sehingga 3 hari selepas ETA</p>
-            </div>
-          </div>
+        <div class="form-row">
+          <label for="category" class="required">Kategori</label>
+          <select id="category" name="category" required>
+            <option value="">— Pilih —</option>
+            <option value="Pelawat">Pelawat</option>
+            <option value="Kontraktor">Kontraktor</option>
+            <option value="Penghantaran Barang">Penghantaran Barang</option>
+            <option value="Pindah Rumah">Pindah Rumah</option>
+            <option value="Pelawat Khas">Pelawat Khas</option>
+          </select>
         </div>
 
-        <hr class="border-t border-gray-200/40" />
+        <div class="form-row span-2">
+          <label for="entryDetails">Butiran kemasukkan</label>
+          <input id="entryDetails" name="entryDetails" placeholder="Contoh: Servis penghawa dingin / Hantar barang" />
+        </div>
+
+        <div id="companyWrap" class="form-row span-2 hidden">
+          <label for="companyName">Nama syarikat</label>
+          <input id="companyName" name="companyName" placeholder="Nama syarikat" />
+        </div>
+
+        <div class="form-row span-2">
+          <label for="visitorName" class="required">Nama pelawat</label>
+          <input id="visitorName" name="visitorName" required placeholder="Contoh: Ahmad bin Ali" />
+        </div>
+
+        <div class="form-row">
+          <label for="visitorPhone">Nombor telefon pelawat</label>
+          <input id="visitorPhone" name="visitorPhone" type="tel" inputmode="tel" placeholder="012-3456789" />
+        </div>
+
+        <div class="form-row">
+          <label for="stayOver">Bermalam?</label>
+          <select id="stayOver" name="stayOver" disabled>
+            <option value="No">Tidak Bermalam</option>
+            <option value="Yes">Bermalam</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <label for="eta" class="required">Tarikh ETA</label>
+          <input id="eta" name="eta" type="date" required />
+        </div>
+
+        <div class="form-row">
+          <label for="etd">Tarikh ETD</label>
+          <input id="etd" name="etd" type="date" />
+          <div class="field-note">ETD boleh dipilih sehingga 3 hari selepas ETA</div>
+        </div>
+
+        <hr style="border:none;border-top:1px solid #e5e7eb;margin:12px 0" />
 
         <!-- Bahagian 3 -->
-        <div>
-          <h2 class="text-lg font-medium">Bahagian 3 — Butiran Kenderaan</h2>
-          <div class="mt-4 grid gap-4 grid-cols-1 md:grid-cols-2">
-            <div id="vehicleSingleWrap">
-              <label for="vehicleNo" class="block text-sm font-medium">Nombor kenderaan</label>
-              <input id="vehicleNo" name="vehicleNo" placeholder="ABC1234" class="mt-1 block w-full rounded-md px-3 py-2" />
-            </div>
+        <h3 style="margin:0 0 8px 0">Bahagian 3 — Butiran Kenderaan</h3>
 
-            <div id="vehicleMultiWrap" class="md:col-span-2 hidden">
-              <label class="block text-sm font-medium">Nombor kenderaan (boleh tambah lebih dari 1)</label>
-              <div id="vehicleList" class="mt-2 space-y-2"></div>
-              <div class="mt-2">
-                <button type="button" id="addVehicleBtn" class="px-3 py-2 border rounded-md text-sm">+ Tambah Nombor Kenderaan</button>
-              </div>
-              <p class="text-xs muted mt-2">Tekan + untuk tambah baris; gunakan – untuk keluarkan baris.</p>
-            </div>
+        <div id="vehicleSingleWrap" class="form-row">
+          <label for="vehicleNo">Nombor kenderaan</label>
+          <input id="vehicleNo" name="vehicleNo" placeholder="ABC1234" />
+        </div>
 
-            <div>
-              <label for="vehicleType" class="block text-sm font-medium">Jenis kenderaan</label>
-              <select id="vehicleType" name="vehicleType" class="mt-1 block w-full rounded-md px-3 py-2">
-                <option value="Kereta / 4x4">Kereta / 4x4</option>
-                <option value="Lori">Lori</option>
-                <option value="Motosikal">Motosikal</option>
-                <option value="Pejalan Kaki">Pejalan Kaki</option>
-              </select>
-            </div>
-          </div>
+        <div id="vehicleMultiWrap" class="form-row span-2 hidden">
+          <label>Nombor kenderaan</label>
+          <div id="vehicleList"></div>
+          <div class="field-note">Tekan + untuk tambah baris; gunakan – untuk keluarkan baris.</div>
+        </div>
+
+        <div class="form-row">
+          <label for="vehicleType">Jenis kenderaan</label>
+          <select id="vehicleType" name="vehicleType">
+            <option value="Kereta / 4x4">Kereta / 4x4</option>
+            <option value="Lori">Lori</option>
+            <option value="Motosikal">Motosikal</option>
+            <option value="Pejalan Kaki">Pejalan Kaki</option>
+          </select>
         </div>
 
         <!-- aksi -->
-        <div class="pt-4 flex items-center gap-3">
-          <button type="submit" id="submitBtn" class="btn-primary px-4 py-2 rounded-md">Hantar</button>
-          <button type="button" id="clearBtn" class="px-4 py-2 border rounded-md">Kosongkan</button>
-          <div id="statusMsg" class="ml-4 text-sm"></div>
+        <div class="form-actions" style="margin-top:6px">
+          <div></div>
+          <div class="actions">
+            <button type="submit" id="submitBtn" class="btn">Hantar</button>
+            <button type="button" id="clearBtn" class="btn-ghost">Kosongkan</button>
+            <div id="statusMsg" class="small" style="align-self:center;margin-left:8px"></div>
+          </div>
         </div>
       </form>
     </section>
