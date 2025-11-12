@@ -1,4 +1,4 @@
-// js/visitor.js (module) - lengkap untuk sokong Pelawat Khas & tarikh sahaja
+// js/visitor.js (module) - sokong companyName aktif mengikut kategori
 import {
   collection, addDoc, serverTimestamp, Timestamp
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
@@ -70,8 +70,7 @@ function getVehicleNumbersFromList(){
   return out;
 }
 
-/* ---------- main ---------- */
-// tunggu DOM siap sebelum inisialisasi
+/* ---------- init after DOM ready ---------- */
 document.addEventListener('DOMContentLoaded', () => {
   (async () => {
     try {
@@ -82,7 +81,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // element refs (ambil dengan pemeriksaan)
+    // element refs
     const form = document.getElementById('visitorForm');
     const clearBtn = document.getElementById('clearBtn');
     const categoryEl = document.getElementById('category');
@@ -90,25 +89,32 @@ document.addEventListener('DOMContentLoaded', () => {
     const etaEl = document.getElementById('eta');
     const etdEl = document.getElementById('etd');
 
+    const companyWrap = document.getElementById('companyWrap');
+    const companyInput = document.getElementById('companyName');
+
     const vehicleSingleWrap = document.getElementById('vehicleSingleWrap');
     const vehicleMultiWrap = document.getElementById('vehicleMultiWrap');
     const vehicleList = document.getElementById('vehicleList');
     const addVehicleBtn = document.getElementById('addVehicleBtn');
 
-    if (!form) {
-      console.error('visitorForm element not found. Aborting init.');
-      return;
-    }
+    // safety
+    if (!form) { console.error('visitorForm missing'); return; }
 
     // initial UI
     if (stayOverEl) stayOverEl.disabled = true;
+    if (companyWrap) companyWrap.style.display = 'none';
     if (vehicleMultiWrap) vehicleMultiWrap.style.display = 'none';
     if (vehicleSingleWrap) vehicleSingleWrap.style.display = 'block';
 
-    // category change handler (safe checks)
+    // helper: categories that require companyName
+    const companyCategories = new Set(['Kontraktor','Penghantaran Barang','Pindah Rumah']);
+
+    // category change: toggle fields
     if (categoryEl) {
       categoryEl.addEventListener('change', () => {
         const v = categoryEl.value;
+
+        // stayOver only for Pelawat
         if (stayOverEl) {
           if (v === 'Pelawat') {
             stayOverEl.disabled = false;
@@ -119,13 +125,24 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         }
 
+        // companyName visible & required for certain categories
+        if (companyWrap && companyInput) {
+          if (companyCategories.has(v)) {
+            companyWrap.style.display = 'block';
+            companyInput.required = true;
+          } else {
+            companyWrap.style.display = 'none';
+            companyInput.required = false;
+            companyInput.value = '';
+          }
+        }
+
+        // vehicle mode: Pelawat Khas -> multi
         if (v === 'Pelawat Khas') {
           if (vehicleSingleWrap) vehicleSingleWrap.style.display = 'none';
           if (vehicleMultiWrap) {
             vehicleMultiWrap.style.display = 'block';
-            if (vehicleList && !vehicleList.querySelector('.vehicle-row')) {
-              vehicleList.appendChild(createVehicleRow(''));
-            }
+            if (vehicleList && !vehicleList.querySelector('.vehicle-row')) vehicleList.appendChild(createVehicleRow(''));
           }
         } else {
           if (vehicleSingleWrap) vehicleSingleWrap.style.display = 'block';
@@ -137,14 +154,12 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
-    // add vehicle row handler (if button exists)
+    // add vehicle row
     if (addVehicleBtn && vehicleList) {
-      addVehicleBtn.addEventListener('click', () => {
-        vehicleList.appendChild(createVehicleRow(''));
-      });
+      addVehicleBtn.addEventListener('click', () => vehicleList.appendChild(createVehicleRow('')));
     }
 
-    // ETA change -> set ETD min/max
+    // ETA -> ETD min/max (ETA + 3 days)
     if (etaEl && etdEl) {
       etaEl.addEventListener('change', () => {
         const etaVal = etaEl.value;
@@ -168,7 +183,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
-    // submit handler (safe element access)
+    // submit handler
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       show('Memproses...', true);
@@ -177,8 +192,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const hostName = document.getElementById('hostName')?.value.trim() || '';
       const hostPhone = document.getElementById('hostPhone')?.value.trim() || '';
 
-      const category = document.getElementById('category')?.value || '';
+      const category = categoryEl?.value || '';
       const entryDetails = document.getElementById('entryDetails')?.value.trim() || '';
+      const companyName = document.getElementById('companyName')?.value.trim() || '';
       const visitorName = document.getElementById('visitorName')?.value.trim() || '';
       const visitorPhone = document.getElementById('visitorPhone')?.value.trim() || '';
       const stayOver = document.getElementById('stayOver')?.value || 'No';
@@ -190,6 +206,8 @@ document.addEventListener('DOMContentLoaded', () => {
       // validation
       if (!hostUnit || !hostName) { show('Sila lengkapkan Butiran Penghuni (Unit & Nama).', false); return; }
       if (!category) { show('Sila pilih Kategori.', false); return; }
+      // require companyName when category in companyCategories
+      if (companyCategories.has(category) && !companyName) { show('Sila masukkan Nama syarikat untuk kategori yang dipilih.', false); return; }
       if (!visitorName) { show('Sila masukkan Nama Pelawat.', false); return; }
       if (!etaVal) { show('Sila pilih Tarikh ETA.', false); return; }
       if (!validatePhone(visitorPhone)) { show('Nombor telefon pelawat tidak sah.', false); return; }
@@ -216,12 +234,14 @@ document.addEventListener('DOMContentLoaded', () => {
         vehicleNo = document.getElementById('vehicleNo')?.value.trim() || '';
       }
 
+      // payload (include companyName)
       const payload = {
         hostUnit,
         hostName,
         hostPhone: hostPhone || '',
         category,
         entryDetails: entryDetails || '',
+        companyName: companyName || '',
         visitorName,
         visitorPhone: visitorPhone || '',
         stayOver: (category === 'Pelawat') ? (stayOver === 'Yes' ? 'Yes' : 'No') : 'No',
@@ -240,6 +260,8 @@ document.addEventListener('DOMContentLoaded', () => {
         await addDoc(col, payload);
         show('Pendaftaran berjaya. Terima kasih.', true);
         form.reset();
+        // reset UI state
+        if (companyWrap) companyWrap.style.display = 'none';
         if (vehicleMultiWrap) vehicleMultiWrap.style.display = 'none';
         if (vehicleSingleWrap) vehicleSingleWrap.style.display = 'block';
         if (vehicleList) vehicleList.innerHTML = '';
@@ -256,6 +278,7 @@ document.addEventListener('DOMContentLoaded', () => {
       clearBtn.addEventListener('click', ()=> {
         form.reset();
         document.getElementById('statusMsg').innerHTML = '';
+        if (companyWrap) companyWrap.style.display = 'none';
         if (vehicleMultiWrap) vehicleMultiWrap.style.display = 'none';
         if (vehicleSingleWrap) vehicleSingleWrap.style.display = 'block';
         if (vehicleList) vehicleList.innerHTML = '';
