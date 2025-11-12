@@ -1,9 +1,9 @@
-// js/visitor.js (module) - sokong companyName aktif mengikut kategori
+// js/visitor.js (module) - theme toggle + form logic (tailwind-ready)
 import {
   collection, addDoc, serverTimestamp, Timestamp
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
-/* ---------- util ---------- */
+/* ---------- helpers ---------- */
 function waitForFirestore(timeout = 5000){
   return new Promise((resolve, reject) => {
     const start = Date.now();
@@ -15,10 +15,19 @@ function waitForFirestore(timeout = 5000){
   });
 }
 
-function show(msg, ok=true){
+function toast(message, ok = true) {
+  const el = document.createElement('div');
+  el.className = `toast ${ok ? 'ok' : 'err'}`;
+  el.textContent = message;
+  document.body.appendChild(el);
+  setTimeout(()=> el.classList.add('fade'), 10);
+  setTimeout(()=> el.remove(), 3300);
+}
+
+function showStatus(msg, ok=true){
   const statusEl = document.getElementById('statusMsg');
-  if (!statusEl) return console.warn('statusMsg element missing');
-  statusEl.innerHTML = `<div class="${ok ? 'msg' : 'small'}">${msg}</div>`;
+  if (!statusEl) return;
+  statusEl.innerHTML = `<span class="${ok ? 'text-green-500' : 'text-red-500'}">${msg}</span>`;
 }
 
 function validatePhone(phone){
@@ -38,30 +47,30 @@ function dateFromInputDateOnly(val){
   return isNaN(dt.getTime()) ? null : dt;
 }
 
-/* ---------- dynamic vehicle helpers ---------- */
+/* ---------- dynamic vehicle ---------- */
 function createVehicleRow(value=''){
   const wrapper = document.createElement('div');
-  wrapper.className = 'vehicle-row row';
-  wrapper.style.marginTop = '8px';
+  wrapper.className = 'flex items-center gap-2';
+
   const input = document.createElement('input');
   input.type = 'text';
-  input.className = 'vehicle-input';
+  input.className = 'block w-full rounded-md px-3 py-2';
   input.placeholder = 'ABC1234';
   input.value = value;
-  input.style.flex = '1';
+
   const removeBtn = document.createElement('button');
   removeBtn.type = 'button';
-  removeBtn.className = 'btn btn-ghost';
+  removeBtn.className = 'px-3 py-2 border rounded-md text-sm';
   removeBtn.textContent = '−';
-  removeBtn.style.marginLeft = '8px';
   removeBtn.addEventListener('click', () => wrapper.remove());
+
   wrapper.appendChild(input);
   wrapper.appendChild(removeBtn);
   return wrapper;
 }
 
 function getVehicleNumbersFromList(){
-  const list = document.querySelectorAll('#vehicleList .vehicle-input');
+  const list = document.querySelectorAll('#vehicleList input');
   const out = [];
   list.forEach(i => {
     const v = i.value.trim();
@@ -70,18 +79,39 @@ function getVehicleNumbersFromList(){
   return out;
 }
 
-/* ---------- init after DOM ready ---------- */
+/* ---------- theme handling ---------- */
+function applyTheme(theme){
+  if (theme === 'light') {
+    document.documentElement.classList.remove('dark');
+    document.getElementById('themeToggle').textContent = 'Dark';
+  } else {
+    document.documentElement.classList.add('dark');
+    document.getElementById('themeToggle').textContent = 'Light';
+  }
+  localStorage.setItem('visitorTheme', theme);
+}
+
+/* ---------- main ---------- */
 document.addEventListener('DOMContentLoaded', () => {
+  // theme init
+  const saved = localStorage.getItem('visitorTheme') || 'dark';
+  applyTheme(saved);
+  document.getElementById('themeToggle')?.addEventListener('click', () => {
+    const cur = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    applyTheme(next);
+  });
+
   (async () => {
     try {
       await waitForFirestore();
     } catch (err) {
       console.error('Firestore init failed', err);
-      show('Initialisasi Firestore gagal. Hubungi pentadbir.', false);
+      showStatus('Initialisasi Firestore gagal. Sila hubungi pentadbir.', false);
       return;
     }
 
-    // element refs
+    // form elements
     const form = document.getElementById('visitorForm');
     const clearBtn = document.getElementById('clearBtn');
     const categoryEl = document.getElementById('category');
@@ -97,96 +127,58 @@ document.addEventListener('DOMContentLoaded', () => {
     const vehicleList = document.getElementById('vehicleList');
     const addVehicleBtn = document.getElementById('addVehicleBtn');
 
-    // safety
     if (!form) { console.error('visitorForm missing'); return; }
 
     // initial UI
     if (stayOverEl) stayOverEl.disabled = true;
-    if (companyWrap) companyWrap.style.display = 'none';
-    if (vehicleMultiWrap) vehicleMultiWrap.style.display = 'none';
-    if (vehicleSingleWrap) vehicleSingleWrap.style.display = 'block';
+    if (companyWrap) companyWrap.classList.add('hidden');
+    if (vehicleMultiWrap) vehicleMultiWrap.classList.add('hidden');
+    if (vehicleSingleWrap) vehicleSingleWrap.classList.remove('hidden');
 
-    // helper: categories that require companyName
     const companyCategories = new Set(['Kontraktor','Penghantaran Barang','Pindah Rumah']);
 
-    // category change: toggle fields
-    if (categoryEl) {
-      categoryEl.addEventListener('change', () => {
-        const v = categoryEl.value;
+    // category change
+    categoryEl?.addEventListener('change', () => {
+      const v = categoryEl.value;
+      if (stayOverEl) {
+        if (v === 'Pelawat') { stayOverEl.disabled = false; if (!stayOverEl.value) stayOverEl.value = 'No'; }
+        else { stayOverEl.value = 'No'; stayOverEl.disabled = true; }
+      }
 
-        // stayOver only for Pelawat
-        if (stayOverEl) {
-          if (v === 'Pelawat') {
-            stayOverEl.disabled = false;
-            if (!stayOverEl.value) stayOverEl.value = 'No';
-          } else {
-            stayOverEl.value = 'No';
-            stayOverEl.disabled = true;
-          }
-        }
+      if (companyWrap && companyInput) {
+        if (companyCategories.has(v)) { companyWrap.classList.remove('hidden'); companyInput.required = true; }
+        else { companyWrap.classList.add('hidden'); companyInput.required = false; companyInput.value = ''; }
+      }
 
-        // companyName visible & required for certain categories
-        if (companyWrap && companyInput) {
-          if (companyCategories.has(v)) {
-            companyWrap.style.display = 'block';
-            companyInput.required = true;
-          } else {
-            companyWrap.style.display = 'none';
-            companyInput.required = false;
-            companyInput.value = '';
-          }
-        }
+      if (v === 'Pelawat Khas') {
+        vehicleSingleWrap?.classList.add('hidden');
+        vehicleMultiWrap?.classList.remove('hidden');
+        if (vehicleList && !vehicleList.querySelector('div')) vehicleList.appendChild(createVehicleRow(''));
+      } else {
+        vehicleSingleWrap?.classList.remove('hidden');
+        vehicleMultiWrap?.classList.add('hidden');
+        if (vehicleList) vehicleList.innerHTML = '';
+      }
+    });
 
-        // vehicle mode: Pelawat Khas -> multi
-        if (v === 'Pelawat Khas') {
-          if (vehicleSingleWrap) vehicleSingleWrap.style.display = 'none';
-          if (vehicleMultiWrap) {
-            vehicleMultiWrap.style.display = 'block';
-            if (vehicleList && !vehicleList.querySelector('.vehicle-row')) vehicleList.appendChild(createVehicleRow(''));
-          }
-        } else {
-          if (vehicleSingleWrap) vehicleSingleWrap.style.display = 'block';
-          if (vehicleMultiWrap) {
-            vehicleMultiWrap.style.display = 'none';
-            if (vehicleList) vehicleList.innerHTML = '';
-          }
-        }
-      });
-    }
+    // add vehicle
+    addVehicleBtn?.addEventListener('click', () => vehicleList.appendChild(createVehicleRow('')));
 
-    // add vehicle row
-    if (addVehicleBtn && vehicleList) {
-      addVehicleBtn.addEventListener('click', () => vehicleList.appendChild(createVehicleRow('')));
-    }
+    // ETA -> ETD constraints
+    etaEl?.addEventListener('change', () => {
+      const etaVal = etaEl.value;
+      if (!etaVal) { if (etdEl) { etdEl.value = ''; etdEl.min = ''; etdEl.max = ''; } return; }
+      const etaDate = dateFromInputDateOnly(etaVal);
+      if (!etaDate) return;
+      const maxDate = new Date(etaDate); maxDate.setDate(maxDate.getDate() + 3);
+      const toIso = d => d.toISOString().slice(0,10);
+      if (etdEl) { etdEl.min = toIso(etaDate); etdEl.max = toIso(maxDate); if (etdEl.value) { const cur = dateFromInputDateOnly(etdEl.value); if (!cur || cur < etaDate || cur > maxDate) etdEl.value = ''; } }
+    });
 
-    // ETA -> ETD min/max (ETA + 3 days)
-    if (etaEl && etdEl) {
-      etaEl.addEventListener('change', () => {
-        const etaVal = etaEl.value;
-        if (!etaVal) {
-          etdEl.value = '';
-          etdEl.min = '';
-          etdEl.max = '';
-          return;
-        }
-        const etaDate = dateFromInputDateOnly(etaVal);
-        if (!etaDate) return;
-        const maxDate = new Date(etaDate);
-        maxDate.setDate(maxDate.getDate() + 3);
-        const toIso = d => d.toISOString().slice(0,10);
-        etdEl.min = toIso(etaDate);
-        etdEl.max = toIso(maxDate);
-        if (etdEl.value) {
-          const cur = dateFromInputDateOnly(etdEl.value);
-          if (!cur || cur < etaDate || cur > maxDate) etdEl.value = '';
-        }
-      });
-    }
-
-    // submit handler
+    // submit
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      show('Memproses...', true);
+      showStatus('Memproses...', true);
 
       const hostUnit = document.getElementById('hostUnit')?.value.trim() || '';
       const hostName = document.getElementById('hostName')?.value.trim() || '';
@@ -200,41 +192,31 @@ document.addEventListener('DOMContentLoaded', () => {
       const stayOver = document.getElementById('stayOver')?.value || 'No';
       const etaVal = document.getElementById('eta')?.value || '';
       const etdVal = document.getElementById('etd')?.value || '';
-
       const vehicleType = document.getElementById('vehicleType')?.value || '';
 
-      // validation
-      if (!hostUnit || !hostName) { show('Sila lengkapkan Butiran Penghuni (Unit & Nama).', false); return; }
-      if (!category) { show('Sila pilih Kategori.', false); return; }
-      // require companyName when category in companyCategories
-      if (companyCategories.has(category) && !companyName) { show('Sila masukkan Nama syarikat untuk kategori yang dipilih.', false); return; }
-      if (!visitorName) { show('Sila masukkan Nama Pelawat.', false); return; }
-      if (!etaVal) { show('Sila pilih Tarikh ETA.', false); return; }
-      if (!validatePhone(visitorPhone)) { show('Nombor telefon pelawat tidak sah.', false); return; }
-      if (hostPhone && !validatePhone(hostPhone)) { show('Nombor telefon penghuni tidak sah.', false); return; }
+      if (!hostUnit || !hostName) { showStatus('Sila lengkapkan Butiran Penghuni (Unit & Nama).', false); toast('Sila lengkapkan Unit & Nama penghuni', false); return; }
+      if (!category) { showStatus('Sila pilih Kategori.', false); toast('Sila pilih kategori', false); return; }
+      if (companyCategories.has(category) && !companyName) { showStatus('Sila masukkan Nama syarikat.', false); toast('Sila masukkan Nama syarikat', false); return; }
+      if (!visitorName) { showStatus('Sila masukkan Nama Pelawat.', false); toast('Sila masukkan Nama Pelawat', false); return; }
+      if (!etaVal) { showStatus('Sila pilih Tarikh ETA.', false); toast('Sila pilih ETA', false); return; }
+      if (!validatePhone(visitorPhone)) { showStatus('Nombor telefon pelawat tidak sah.', false); toast('Nombor telefon pelawat tidak sah', false); return; }
+      if (hostPhone && !validatePhone(hostPhone)) { showStatus('Nombor telefon penghuni tidak sah.', false); toast('Nombor telefon penghuni tidak sah', false); return; }
 
       const etaDate = dateFromInputDateOnly(etaVal);
       const etdDate = etdVal ? dateFromInputDateOnly(etdVal) : null;
-      if (!etaDate) { show('Tarikh ETA tidak sah.', false); return; }
-      if (etdVal && !etdDate) { show('Tarikh ETD tidak sah.', false); return; }
-      if (etdDate) {
-        const max = new Date(etaDate); max.setDate(max.getDate() + 3);
-        if (etdDate < etaDate || etdDate > max) {
-          show('Tarikh ETD mesti antara ETA hingga 3 hari selepas ETA.', false); return;
-        }
-      }
+      if (!etaDate) { showStatus('Tarikh ETA tidak sah.', false); toast('Tarikh ETA tidak sah', false); return; }
+      if (etdVal && !etdDate) { showStatus('Tarikh ETD tidak sah.', false); toast('Tarikh ETD tidak sah', false); return; }
+      if (etdDate) { const max = new Date(etaDate); max.setDate(max.getDate() + 3); if (etdDate < etaDate || etdDate > max) { showStatus('Tarikh ETD mesti antara ETA hingga 3 hari selepas ETA.', false); toast('Tarikh ETD luar julat', false); return; } }
 
-      // vehicle handling
       let vehicleNo = '';
       let vehicleNumbers = [];
       if (category === 'Pelawat Khas') {
-        if (vehicleList) vehicleNumbers = getVehicleNumbersFromList();
-        if (!vehicleNumbers.length) { show('Sila masukkan sekurang-kurangnya satu nombor kenderaan untuk Pelawat Khas.', false); return; }
+        vehicleNumbers = getVehicleNumbersFromList();
+        if (!vehicleNumbers.length) { showStatus('Sila masukkan sekurang-kurangnya satu nombor kenderaan.', false); toast('Sila masukkan nombor kenderaan', false); return; }
       } else {
         vehicleNo = document.getElementById('vehicleNo')?.value.trim() || '';
       }
 
-      // payload (include companyName)
       const payload = {
         hostUnit,
         hostName,
@@ -258,33 +240,32 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         const col = collection(window.__FIRESTORE, 'responses');
         await addDoc(col, payload);
-        show('Pendaftaran berjaya. Terima kasih.', true);
+        showStatus('Pendaftaran berjaya. Terima kasih.', true);
+        toast('Pendaftaran berjaya', true);
         form.reset();
-        // reset UI state
-        if (companyWrap) companyWrap.style.display = 'none';
-        if (vehicleMultiWrap) vehicleMultiWrap.style.display = 'none';
-        if (vehicleSingleWrap) vehicleSingleWrap.style.display = 'block';
+        if (companyWrap) companyWrap.classList.add('hidden');
+        if (vehicleMultiWrap) vehicleMultiWrap.classList.add('hidden');
+        if (vehicleSingleWrap) vehicleSingleWrap.classList.remove('hidden');
         if (vehicleList) vehicleList.innerHTML = '';
         if (stayOverEl) { stayOverEl.disabled = true; stayOverEl.value = 'No'; }
         if (etdEl) { etdEl.min = ''; etdEl.max = ''; etdEl.value = ''; }
       } catch (err) {
         console.error('visitor add error', err);
-        show('Gagal hantar. Sila cuba lagi atau hubungi pentadbir.', false);
+        showStatus('Gagal hantar. Sila cuba lagi atau hubungi pentadbir.', false);
+        toast('Gagal hantar. Sila cuba lagi', false);
       }
     });
 
     // clear handler
-    if (clearBtn) {
-      clearBtn.addEventListener('click', ()=> {
-        form.reset();
-        document.getElementById('statusMsg').innerHTML = '';
-        if (companyWrap) companyWrap.style.display = 'none';
-        if (vehicleMultiWrap) vehicleMultiWrap.style.display = 'none';
-        if (vehicleSingleWrap) vehicleSingleWrap.style.display = 'block';
-        if (vehicleList) vehicleList.innerHTML = '';
-        if (stayOverEl) { stayOverEl.disabled = true; stayOverEl.value = 'No'; }
-        if (etdEl) { etdEl.min = ''; etdEl.max = ''; etdEl.value = ''; }
-      });
-    }
+    clearBtn?.addEventListener('click', () => {
+      form.reset();
+      showStatus('', true);
+      if (companyWrap) companyWrap.classList.add('hidden');
+      if (vehicleMultiWrap) vehicleMultiWrap.classList.add('hidden');
+      if (vehicleSingleWrap) vehicleSingleWrap.classList.remove('hidden');
+      if (vehicleList) vehicleList.innerHTML = '';
+      if (stayOverEl) { stayOverEl.disabled = true; stayOverEl.value = 'No'; }
+      if (etdEl) { etdEl.min = ''; etdEl.max = ''; etdEl.value = ''; }
+    });
   })();
 });
