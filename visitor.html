@@ -5,11 +5,17 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Borang Daftar Pelawat — Banjaria Court</title>
 
+  <!-- Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+
+  <!-- Optional utilities -->
   <script src="https://v1.tailwindcss.com"></script>
+
+  <!-- main site CSS -->
   <link rel="stylesheet" href="css/style.css">
+
   <style>
-    /* kecil: gaya untuk autocomplete dropdown */
+    /* small autocomplete styles */
     .autocomplete-wrap { position: relative; }
     .autocomplete-list {
       position: absolute;
@@ -17,27 +23,19 @@
       left: 0;
       right: 0;
       margin-top: 6px;
-      background: var(--card);
-      border: 1px solid var(--input-border);
+      background: var(--card, #fff);
+      border: 1px solid var(--input-border, #e5e7eb);
       border-radius: 8px;
       max-height: 260px;
       overflow: auto;
       box-shadow: 0 8px 24px rgba(0,0,0,0.08);
     }
-    .autocomplete-item {
-      padding: 8px 10px;
-      cursor: pointer;
-      font-family: inherit;
-    }
-    .autocomplete-item[aria-selected="true"],
-    .autocomplete-item:hover {
-      background: var(--accent);
-      color: #fff;
-    }
-    .autocomplete-empty {
-      padding: 10px;
-      color: var(--muted);
-    }
+    .autocomplete-item { padding: 8px 10px; cursor: pointer; font-family: inherit; }
+    .autocomplete-item[aria-selected="true"], .autocomplete-item:hover { background: #3b82f6; color: #fff; }
+    .autocomplete-header { font-weight:700; padding:6px 10px; background:transparent; cursor:default; color:var(--muted,#374151); }
+    .autocomplete-empty { padding: 10px; color: var(--muted,#6b7280); }
+    /* small utility to make checkbox label clickable */
+    .confirm-row label { cursor: pointer; }
   </style>
 </head>
 <body>
@@ -83,7 +81,7 @@
 
         <hr style="border:none;border-top:1px solid var(--input-border);margin:12px 0" />
 
-        <!-- Bahagian 2 (tidak diubah) -->
+        <!-- Bahagian 2 -->
         <h3 style="margin:0 0 8px 0">Bahagian 2 — Butiran Kemasukkan</h3>
 
         <div class="form-row">
@@ -180,8 +178,29 @@
           </select>
         </div>
 
+        <!-- Pengesahan -->
+        <div class="form-row span-2" style="margin-top:12px">
+          <fieldset style="border:0;padding:0;margin:0">
+            <legend class="required" style="font-weight:600;margin-bottom:6px">Pengesahan</legend>
+            <div style="font-size:13px;color:var(--muted);line-height:1.4;margin-bottom:8px">
+              Dengan ini saya mengesahkan bahawa :-
+              <ol style="margin:6px 0 0 18px;padding:0">
+                <li>Butiran yang di isi adalah benar.</li>
+                <li>Saya juga bertanggungjawab sepenuhnya ke atas apa-apa kerosakan yang dilakukan oleh pelawat / kontraktor / syarikat, sepanjang mereka berada di dalam Banjaria Court.</li>
+                <li>Saya juga akur, sekiranya data yang di isi berbeza, pihak pengurusan berhak untuk tidak benarkan masuk ke Banjaria Court.</li>
+              </ol>
+            </div>
+
+            <div class="confirm-row" style="display:flex;gap:8px;align-items:center">
+              <input id="confirmAgree" type="checkbox" name="confirmAgree" />
+              <label for="confirmAgree" style="font-weight:600">Saya setuju</label>
+              <div id="confirmHelp" class="field-note" style="margin-left:8px;color:var(--muted);font-size:12px">Tandakan untuk meneruskan pendaftaran.</div>
+            </div>
+          </fieldset>
+        </div>
+
         <!-- aksi -->
-        <div class="form-actions" style="margin-top:6px">
+        <div class="form-actions" style="margin-top:12px">
           <div></div>
           <div class="actions">
             <button type="submit" id="submitBtn" class="btn">Hantar</button>
@@ -193,6 +212,7 @@
     </section>
   </main>
 
+  <!-- Firebase init then visitor.js -->
   <script type="module" src="js/firebase-init.js"></script>
   <script type="module" src="js/visitor.js"></script>
 </body>
