@@ -1,9 +1,9 @@
-// js/visitor.js - lengkap, grouped autocomplete + normalization + full units array
+// js/visitor.js - lengkap: grouped autocomplete + normalization + agreement checkbox
 import {
   collection, addDoc, serverTimestamp, Timestamp
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
-/* ---------- full units array (paste dari List.csv) ---------- */
+/* ---------- full units array (from your List.csv) ---------- */
 const units = [
 "A-1-1","A-1-2","A-1-3","A-1-4","A-1-5","A-1-6","A-1-7","A-1-8","A-1-9","A-1-10",
 "A-2-1","A-2-2","A-2-3","A-2-4","A-2-5","A-2-6","A-2-7","A-2-8","A-2-9","A-2-10",
@@ -289,7 +289,7 @@ function isPatternValidUnit(val) {
   return /^[A-Z0-9]+-\d{1,3}-\d{1,2}$/.test(val);
 }
 
-/* ---------- subcategory/company/etd logic (kept) ---------- */
+/* ---------- subcategory/company/etd logic ---------- */
 const companyCategories = new Set(['Kontraktor','Penghantaran Barang','Pindah Rumah']);
 const categoriesEtdDisabled = new Set(['Kontraktor','Penghantaran Barang','Pindah Rumah']);
 
@@ -399,6 +399,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const input = document.getElementById('hostUnit');
   const wrapper = input?.closest('.autocomplete-wrap');
   const listEl = document.getElementById('unitSuggestions');
+  const confirmAgreeEl = document.getElementById('confirmAgree');
 
   // input handlers
   input?.addEventListener('input', (e) => {
@@ -482,7 +483,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const stayOverEl = document.getElementById('stayOver');
     const etaEl = document.getElementById('eta');
     const etdEl = document.getElementById('etd');
-    const hostUnitEl = document.getElementById('hostUnit');
 
     const companyWrap = document.getElementById('companyWrap');
     const companyInput = document.getElementById('companyName');
@@ -614,6 +614,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const etdVal = document.getElementById('etd')?.value || '';
       const vehicleType = document.getElementById('vehicleType')?.value || '';
 
+      // basic validation
       if (!hostUnit) { showStatus('Sila masukkan Unit rumah.', false); toast('Sila masukkan Unit rumah', false); return; }
       if (!isPatternValidUnit(hostUnit)) { showStatus('Format Unit tidak sah. Gunakan contoh A-12-03.', false); toast('Format Unit tidak sah', false); return; }
       if (!hostName) { showStatus('Sila lengkapkan Butiran Penghuni (Nama).', false); toast('Sila lengkapkan Nama penghuni', false); return; }
@@ -634,6 +635,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (etdDate < etaDate || etdDate > max) { showStatus('Tarikh ETD mesti antara ETA hingga 3 hari selepas ETA.', false); toast('Tarikh ETD mesti antara ETA hingga 3 hari selepas ETA', false); return; }
       }
 
+      // agreement checkbox
+      if (!(confirmAgreeEl && confirmAgreeEl.checked)) {
+        if (confirmAgreeEl) confirmAgreeEl.focus();
+        showStatus('Sila tandakan "Saya setuju" untuk meneruskan.', false);
+        toast('Sila tandakan "Saya setuju" sebelum hantar', false);
+        return;
+      }
+
+      // vehicle handling
       let vehicleNo = '';
       let vehicleNumbers = [];
       if (category === 'Pelawat Khas') {
@@ -675,6 +685,7 @@ document.addEventListener('DOMContentLoaded', () => {
         toast('Pendaftaran berjaya', true);
         form.reset();
         closeSuggestions(wrapper);
+        if (confirmAgreeEl) confirmAgreeEl.checked = false;
         setCompanyFieldState(false);
         updateSubCategoryForCategory('');
         if (vehicleMultiWrap) vehicleMultiWrap.classList.add('hidden');
@@ -695,6 +706,7 @@ document.addEventListener('DOMContentLoaded', () => {
       form.reset();
       showStatus('', true);
       closeSuggestions(wrapper);
+      if (confirmAgreeEl) confirmAgreeEl.checked = false;
       setCompanyFieldState(false);
       updateSubCategoryForCategory('');
       if (vehicleMultiWrap) vehicleMultiWrap.classList.add('hidden');
