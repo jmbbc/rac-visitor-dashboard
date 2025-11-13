@@ -32,11 +32,10 @@
         <div class="inline-two">
           <div class="form-row">
             <label for="hostUnit" class="required">Unit rumah</label>
-            <!-- Strict select: pengguna mesti pilih dari senarai -->
-            <select id="hostUnit" name="hostUnit" required>
-              <option value="">— Pilih Unit —</option>
-              <!-- options populated by JS -->
-            </select>
+            <input id="hostUnit" name="hostUnit" required placeholder="Contoh: A-12-03" list="unitList"
+                   aria-describedby="unitHelp" autocomplete="off" />
+            <datalist id="unitList"></datalist>
+            <div id="unitHelp" class="field-note">Gunakan format <strong>A-12-03</strong>. Pilih dari cadangan jika sesuai.</div>
           </div>
 
           <div class="form-row">
@@ -162,7 +161,6 @@
     </section>
   </main>
 
-  <!-- Firebase init then visitor.js -->
   <script type="module" src="js/firebase-init.js"></script>
   <script type="module" src="js/visitor.js"></script>
 </body>
