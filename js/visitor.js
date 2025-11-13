@@ -1,4 +1,4 @@
-// js/visitor.js - versi dengan strict select unit (populate dari senarai)
+// js/visitor.js - datalist + normalization (soft validation)
 import {
   collection, addDoc, serverTimestamp, Timestamp
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
@@ -94,7 +94,7 @@ function getVehicleNumbersFromList(){
   return out;
 }
 
-/* ---------- unit list (dari List.csv yang anda lampirkan) ---------- */
+/* ---------- units list (from your List.csv) ---------- */
 const units = [
   "A-1-1","A-1-2","A-1-3","A-1-4","A-1-5","A-1-6","A-1-7","A-1-8","A-1-9","A-1-10",
   "A-2-1","A-2-2","A-2-3","A-2-4","A-2-5","A-2-6","A-2-7","A-2-8","A-2-9","A-2-10",
@@ -159,7 +159,32 @@ const units = [
   "B3-G-1","B3-G-2","B3-G-3","B3-G-4","B3-G-5","B3-G-6","B3-G-7","B3-G-8","B3-G-9","B3-G-10","B3-G-11","B3-G-12"
 ];
 
-/* ---------- category / subcategory / company logic (kept same as earlier) ---------- */
+/* ---------- helper: populate datalist ---------- */
+function populateDatalist() {
+  const dl = document.getElementById('unitList');
+  if (!dl) return;
+  dl.innerHTML = units.map(u => `<option value="${u}">`).join('');
+}
+
+/* ---------- normalization & validation ---------- */
+function normalizeUnitInput(raw) {
+  if (!raw) return '';
+  let s = raw.trim().toUpperCase();
+  // replace spaces and common separators with single hyphen
+  s = s.replace(/\s+/g, '').replace(/[_\.\/\\]/g, '-').replace(/-{2,}/g,'-');
+  // handle common user input like A1203 -> A-12-03 (heuristic)
+  const m = s.match(/^([A-Z]{1,2})(\d{1,3})(\d{1,2})$/);
+  if (m) s = `${m[1]}-${parseInt(m[2],10)}-${m[3]}`;
+  return s;
+}
+
+function isPatternValidUnit(val) {
+  if (!val) return false;
+  // Accept: Letter(s)-number-number (e.g., A-12-03, B1-3-12)
+  return /^[A-Z0-9]+-\d{1,3}-\d{1,2}$/.test(val);
+}
+
+/* ---------- subcategory/company/etd etc (kept from earlier implementation) ---------- */
 const companyCategories = new Set(['Kontraktor','Penghantaran Barang','Pindah Rumah']);
 const categoriesEtdDisabled = new Set(['Kontraktor','Penghantaran Barang','Pindah Rumah']);
 
@@ -190,29 +215,79 @@ const subCategoryHelpMap = {
   'Renovasi': 'Kerja-kerja pengubahsuaian (contoh: cat, tukar jubin). Pastikan kontraktor bawa dokumen kelulusan dan senarai pekerja.',
   'Telekomunikasi': 'Kerja pemasangan/servis telekomunikasi. Sertakan nombor projek/PO dan waktu kerja jangkaan.',
   'Kerja Servis': 'Servis berkala seperti penyelenggaraan lif, AC, atau sistem mekanikal. Nyatakan alat yang dibawa jika perlu.',
-  'Kawalan Serangga Perosak': 'Rawatan kawalan perosak. Pastikan kawasan yang terlibat dan langkah keselamatan diber2i tahu.',
+  'Kawalan Serangga Perosak': 'Rawatan kawalan perosak. Pastikan kawasan yang terlibat dan langkah keselamatan diberi tahu.',
   'Kerja Pembaikan': 'Pembaikan kecil/struktur. Nyatakan skop kerja ringkas dan akses yang diperlukan.',
   'Pemeriksaan': 'Pemeriksaan keselamatan/inspeksi; sertakan pihak yang melakukan pemeriksaan dan tujuan pemeriksaan.'
 };
 
-/* ---------- helper to populate unit select and enforce strict choice ---------- */
-function populateUnitSelect() {
-  const sel = document.getElementById('hostUnit');
-  if (!sel) return;
-  // clear existing dynamic options (keep first placeholder)
-  sel.querySelectorAll('option[data-dyn]').forEach(o => o.remove());
-  units.forEach(u => {
-    const o = document.createElement('option');
-    o.value = u;
-    o.textContent = u;
-    o.setAttribute('data-dyn','1');
-    sel.appendChild(o);
-  });
+function setCompanyFieldState(show) {
+  const companyWrap = document.getElementById('companyWrap');
+  const companyInput = document.getElementById('companyName');
+  if (!companyWrap || !companyInput) return;
+  if (show) {
+    companyWrap.classList.remove('hidden');
+    companyInput.required = true;
+    companyInput.disabled = false;
+    companyInput.removeAttribute('aria-hidden');
+  } else {
+    companyWrap.classList.add('hidden');
+    companyInput.required = false;
+    companyInput.disabled = true;
+    companyInput.value = '';
+    companyInput.setAttribute('aria-hidden','true');
+  }
 }
 
-// strict validation helper
-function isValidUnitChoice(val) {
-  return units.includes(val);
+function updateSubCategoryForCategory(cat) {
+  const wrap = document.getElementById('subCategoryWrap');
+  const select = document.getElementById('subCategory');
+  const helpWrap = document.getElementById('subCategoryHelpWrap');
+  const helpEl = document.getElementById('subCategoryHelp');
+  if (!wrap || !select) return;
+
+  // reset
+  select.innerHTML = '<option value="">— Pilih —</option>';
+  select.required = false;
+  select.disabled = true;
+  wrap.classList.add('hidden');
+  wrap.setAttribute('aria-hidden','true');
+
+  if (helpEl) { helpEl.textContent = ''; }
+  if (helpWrap) { helpWrap.classList.add('hidden'); helpWrap.setAttribute('aria-hidden','true'); }
+
+  if (subCategoryMap[cat]) {
+    subCategoryMap[cat].forEach(opt => {
+      const o = document.createElement('option');
+      o.value = opt.value;
+      o.textContent = opt.label;
+      select.appendChild(o);
+    });
+    wrap.classList.remove('hidden');
+    wrap.removeAttribute('aria-hidden');
+    select.disabled = false;
+    select.required = true;
+    select.removeEventListener('change', showSubCategoryHelp);
+    select.addEventListener('change', showSubCategoryHelp);
+    showSubCategoryHelp();
+  }
+}
+
+function showSubCategoryHelp() {
+  const select = document.getElementById('subCategory');
+  const val = select?.value || '';
+  const helpWrap = document.getElementById('subCategoryHelpWrap');
+  const helpEl = document.getElementById('subCategoryHelp');
+  if (!helpEl || !helpWrap) return;
+
+  if (val && subCategoryHelpMap[val]) {
+    helpEl.textContent = subCategoryHelpMap[val];
+    helpWrap.classList.remove('hidden');
+    helpWrap.removeAttribute('aria-hidden');
+  } else {
+    helpEl.textContent = '';
+    helpWrap.classList.add('hidden');
+    helpWrap.setAttribute('aria-hidden','true');
+  }
 }
 
 /* ---------- theme handling ---------- */
@@ -231,6 +306,8 @@ function applyTheme(theme){
 
 /* ---------- main init ---------- */
 document.addEventListener('DOMContentLoaded', () => {
+  populateDatalist();
+
   const savedTheme = (localStorage.getItem('visitorTheme') || 'dark');
   applyTheme(savedTheme);
   document.getElementById('themeToggle')?.addEventListener('click', () => {
@@ -238,9 +315,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const next = cur === 'dark' ? 'light' : 'dark';
     applyTheme(next);
   });
-
-  // populate unit select immediately
-  populateUnitSelect();
 
   (async () => {
     try {
@@ -259,6 +333,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const stayOverEl = document.getElementById('stayOver');
     const etaEl = document.getElementById('eta');
     const etdEl = document.getElementById('etd');
+    const hostUnitEl = document.getElementById('hostUnit');
 
     const companyWrap = document.getElementById('companyWrap');
     const companyInput = document.getElementById('companyName');
@@ -269,6 +344,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const addVehicleBtn = document.getElementById('addVehicleBtn');
 
     if (!form) { console.error('visitorForm missing'); return; }
+
+    // attach normalization on blur
+    hostUnitEl?.addEventListener('blur', (e) => {
+      const norm = normalizeUnitInput(e.target.value || '');
+      e.target.value = norm;
+      if (norm && !isPatternValidUnit(norm)) {
+        hostUnitEl.setCustomValidity('Format tidak sah. Gunakan contoh A-12-03.');
+        showStatus('Unit rumah: format tidak sah. Gunakan contoh A-12-03.', false);
+      } else {
+        hostUnitEl.setCustomValidity('');
+        // soft warning if not in list
+        if (norm && !units.includes(norm)) {
+          showStatus('Unit tidak ditemui dalam senarai; pastikan ia betul.', true);
+        } else {
+          showStatus('', true);
+        }
+      }
+    });
 
     // helper: update vehicle controls visibility + add button enabled state
     function updateVehicleControlsForCategory(cat) {
@@ -408,7 +501,7 @@ document.addEventListener('DOMContentLoaded', () => {
       vehicleList.appendChild(createVehicleRow(''));
     });
 
-    // ETA -> ETD constraints (kept but ETD enabled state controlled by updateEtdState)
+    // ETA -> ETD constraints
     etaEl?.addEventListener('change', () => {
       const etaVal = etaEl.value;
       if (!etaVal) {
@@ -422,13 +515,12 @@ document.addEventListener('DOMContentLoaded', () => {
       if (etdEl) {
         etdEl.min = toIso(etaDate);
         etdEl.max = toIso(maxDate);
-        // ensure ETD still obeys category rules
         const cat = categoryEl?.value?.trim() || '';
         updateEtdState(cat);
       }
     });
 
-    // initialize company/vehicle/subcategory/etd state based on current category (if form populated)
+    // initialize subcategory/vehicle/etd state based on current category (if form populated)
     const initCat = categoryEl?.value?.trim() || '';
     setCompanyFieldState(companyCategories.has(initCat));
     updateSubCategoryForCategory(initCat);
@@ -440,8 +532,10 @@ document.addEventListener('DOMContentLoaded', () => {
       e.preventDefault();
       showStatus('Memproses...', true);
 
-      // gather
-      const hostUnit = document.getElementById('hostUnit')?.value.trim() || '';
+      // gather and normalize unit
+      const rawUnit = document.getElementById('hostUnit')?.value || '';
+      const hostUnit = normalizeUnitInput(rawUnit);
+
       const hostName = document.getElementById('hostName')?.value.trim() || '';
       const hostPhone = document.getElementById('hostPhone')?.value.trim() || '';
 
@@ -456,9 +550,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const etdVal = document.getElementById('etd')?.value || '';
       const vehicleType = document.getElementById('vehicleType')?.value || '';
 
-      // validation
-      if (!hostUnit) { showStatus('Sila pilih Unit rumah.', false); toast('Sila pilih Unit rumah', false); return; }
-      if (!isValidUnitChoice(hostUnit)) { showStatus('Unit pilihan tidak sah. Sila pilih dari senarai.', false); toast('Unit tidak sah', false); return; }
+      // validation (soft + required)
+      if (!hostUnit) { showStatus('Sila masukkan Unit rumah.', false); toast('Sila masukkan Unit rumah', false); return; }
+      if (!isPatternValidUnit(hostUnit)) { showStatus('Format Unit tidak sah. Gunakan contoh A-12-03.', false); toast('Format Unit tidak sah', false); return; }
       if (!hostName) { showStatus('Sila lengkapkan Butiran Penghuni (Nama).', false); toast('Sila lengkapkan Nama penghuni', false); return; }
       if (!category) { showStatus('Sila pilih Kategori.', false); toast('Sila pilih kategori', false); return; }
       if (subCategoryMap[category] && !subCategory) { showStatus('Sila pilih pilihan bagi kategori ini.', false); toast('Sila pilih pilihan bagi kategori ini', false); return; }
@@ -487,9 +581,12 @@ document.addEventListener('DOMContentLoaded', () => {
         vehicleNo = document.getElementById('vehicleNo')?.value.trim() || '';
       }
 
-      // prepare payload
+      // payload includes whether unit matched provided list (soft check)
+      const unitFound = units.includes(hostUnit);
+
       const payload = {
         hostUnit,
+        hostUnitFound: unitFound,
         hostName,
         hostPhone: hostPhone || '',
         category,
@@ -516,8 +613,7 @@ document.addEventListener('DOMContentLoaded', () => {
         showStatus('Pendaftaran berjaya. Terima kasih.', true);
         toast('Pendaftaran berjaya', true);
         form.reset();
-        // reset UI bits
-        populateUnitSelect(); // re-populate to keep placeholder option
+        populateDatalist(); // keep datalist ready
         setCompanyFieldState(false);
         updateSubCategoryForCategory('');
         if (vehicleMultiWrap) vehicleMultiWrap.classList.add('hidden');
@@ -537,7 +633,7 @@ document.addEventListener('DOMContentLoaded', () => {
     clearBtn?.addEventListener('click', () => {
       form.reset();
       showStatus('', true);
-      populateUnitSelect();
+      populateDatalist();
       setCompanyFieldState(false);
       updateSubCategoryForCategory('');
       if (vehicleMultiWrap) vehicleMultiWrap.classList.add('hidden');
