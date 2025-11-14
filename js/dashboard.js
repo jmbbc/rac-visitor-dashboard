@@ -1,6 +1,4 @@
-// js/dashboard.js (module)
-// Pastikan js/firebase-init.js dimuatkan dahulu dan window.__FIRESTORE & window.__AUTH tersedia.
-
+// js/dashboard.js (module) - versi dikemaskini untuk mobile-friendly, today-only ETA filter, WhatsApp links, sidebar pages
 import {
   collection, query, where, getDocs, orderBy, doc, updateDoc, serverTimestamp, addDoc, Timestamp
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
@@ -18,24 +16,41 @@ function formatDateOnly(ts){
   const yy = d.getFullYear();
   return `${dd}/${mm}/${yy}`;
 }
+function isoDateString(d){ // yyyy-mm-dd
+  const dd = String(d.getDate()).padStart(2,'0');
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const yy = d.getFullYear();
+  return `${yy}-${mm}-${dd}`;
+}
 function showLoginMsg(el, m, ok=true){ el.textContent = m; el.style.color = ok ? 'green' : 'red'; }
+function toast(msg){ const t = document.createElement('div'); t.className = 'msg'; t.textContent = msg; document.body.appendChild(t); setTimeout(()=>t.remove(),3000); }
 
-/* ---------- DOM refs (must exist in dashboard.html) ---------- */
+/* ---------- DOM refs ---------- */
 const loginBox = document.getElementById('loginBox');
 const loginBtn = document.getElementById('loginBtn');
 const logoutBtn = document.getElementById('logoutBtn');
 const loginMsg = document.getElementById('loginMsg');
 const dashboardArea = document.getElementById('dashboardArea');
 const who = document.getElementById('who');
-const listArea = document.getElementById('listArea');
+const listAreaSummary = document.getElementById('listAreaSummary');
+const listAreaCheckedIn = document.getElementById('listAreaCheckedIn');
 const reloadBtn = document.getElementById('reloadBtn');
+const filterDate = document.getElementById('filterDate');
+const todayLabel = document.getElementById('todayLabel');
+const todayTime = document.getElementById('todayTime');
+const kpiWrap = document.getElementById('kpiWrap');
+const injectedControls = document.getElementById('injectedControls');
 
-// overlap controls container (injected after login)
+const navSummary = document.getElementById('navSummary');
+const navCheckedIn = document.getElementById('navCheckedIn');
+const exportCSVBtn = document.getElementById('exportCSVBtn');
+
+/* injected overlap controls referencing (we keep same markup as before) */
 const overlapWrap = document.createElement('div');
 overlapWrap.className = 'card small';
 overlapWrap.style.margin = '12px 0';
 overlapWrap.innerHTML = `
-  <div style="display:flex;gap:8px;align-items:center">
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
     <label style="font-weight:700">Pilih tarikh</label>
     <input id="overlapDate" type="date" />
     <button id="checkOverlapBtn" class="btn btn-ghost">Semak Pertindihan Kenderaan</button>
@@ -68,17 +83,22 @@ onAuthStateChanged(window.__AUTH, user => {
     dashboardArea.style.display = 'block';
     who.textContent = user.email || user.uid;
     logoutBtn.style.display = 'inline-block';
-    // insert overlap controls once
+    // inject overlap controls once
     if (!document.getElementById('overlapDate')) {
-      dashboardArea.insertBefore(overlapWrap, listArea);
+      injectedControls.appendChild(overlapWrap);
       overlapDateEl = document.getElementById('overlapDate');
       checkOverlapBtn = document.getElementById('checkOverlapBtn');
       clearOverlapBtn = document.getElementById('clearOverlapBtn');
       overlapResultEl = document.getElementById('overlapResult');
       checkOverlapBtn.addEventListener('click', ()=> checkOverlapsAndRender());
-      clearOverlapBtn.addEventListener('click', ()=> { overlapDateEl.value=''; overlapResultEl.innerHTML=''; loadList(); });
+      clearOverlapBtn.addEventListener('click', ()=> { overlapDateEl.value=''; overlapResultEl.innerHTML=''; loadTodayList(); });
     }
-    loadList();
+    // set today's date into filter and label
+    const now = new Date();
+    todayLabel.textContent = formatDateOnly(now);
+    todayTime.textContent = now.toLocaleTimeString();
+    filterDate.value = isoDateString(now);
+    loadTodayList();
   } else {
     loginBox.style.display = 'block';
     dashboardArea.style.display = 'none';
@@ -86,51 +106,111 @@ onAuthStateChanged(window.__AUTH, user => {
   }
 });
 
-/* ---------- fetch & render ---------- */
-async function loadList(dateRangeQuery=null){
-  listArea.innerHTML = '<div class="small">Memuat...</div>';
+/* ---------- paging & fetch ---------- */
+async function loadTodayList(){
+  // Uses filterDate value; default to today
+  const dateStr = filterDate.value || isoDateString(new Date());
+  await loadListForDateStr(dateStr);
+}
+
+reloadBtn.addEventListener('click', ()=> loadTodayList());
+filterDate.addEventListener('change', ()=> loadTodayList());
+
+navSummary.addEventListener('click', ()=> { showPage('summary'); });
+navCheckedIn.addEventListener('click', ()=> { showPage('checkedin'); });
+
+exportCSVBtn.addEventListener('click', ()=> {
+  exportCSVForToday();
+});
+
+/* ---------- core fetch for a given date string yyyy-mm-dd ---------- */
+async function loadListForDateStr(yyyymmdd){
+  const d = yyyymmdd.split('-');
+  if (d.length !== 3) { listAreaSummary.innerHTML = '<div class="small">Tarikh tidak sah</div>'; return; }
+  const from = new Date(parseInt(d[0],10), parseInt(d[1],10)-1, parseInt(d[2],10), 0,0,0,0);
+  const to = new Date(from); to.setDate(to.getDate()+1);
+
+  listAreaSummary.innerHTML = '<div class="small">Memuat...</div>';
+  listAreaCheckedIn.innerHTML = '<div class="small">Memuat...</div>';
   try {
     const col = collection(window.__FIRESTORE, 'responses');
-    let q;
-    if (dateRangeQuery && dateRangeQuery.from && dateRangeQuery.to) {
-      q = query(col, where('eta', '>=', Timestamp.fromDate(dateRangeQuery.from)), where('eta', '<', Timestamp.fromDate(dateRangeQuery.to)), orderBy('eta', 'desc'));
-    } else {
-      q = query(col, orderBy('createdAt', 'desc'));
-    }
+    const q = query(col, where('eta', '>=', Timestamp.fromDate(from)), where('eta', '<', Timestamp.fromDate(to)), orderBy('eta','asc'));
     const snap = await getDocs(q);
     const rows = [];
     snap.forEach(d => rows.push({ id: d.id, ...d.data() }));
-    renderList(rows, new Map());
+
+    // compute KPIs
+    let pending = 0, checkedIn = 0, checkedOut = 0;
+    rows.forEach(r => {
+      if (!r.status || r.status === 'Pending') pending++;
+      else if (r.status === 'Checked In') checkedIn++;
+      else if (r.status === 'Checked Out') checkedOut++;
+    });
+    renderKPIs(pending, checkedIn, checkedOut);
+
+    // render both pages: summary (all) and checked-in (filtered)
+    renderList(rows, listAreaSummary, false);
+    renderList(rows.filter(r => r.status === 'Checked In'), listAreaCheckedIn, true);
   } catch (err) {
     console.error('loadList err', err);
-    listArea.innerHTML = '<div class="small">Gagal muat. Semak konsol.</div>';
+    listAreaSummary.innerHTML = '<div class="small">Gagal muat. Semak konsol.</div>';
+    listAreaCheckedIn.innerHTML = '<div class="small">Gagal muat. Semak konsol.</div>';
   }
 }
 
-function renderList(rows, conflictMap = new Map()){
-  if (!rows.length) { listArea.innerHTML = '<div class="small">Tiada rekod</div>'; return; }
+/* ---------- render helpers ---------- */
+function renderKPIs(pending, checkedIn, checkedOut){
+  kpiWrap.innerHTML = '';
+  const createChip = (label, val) => {
+    const d = document.createElement('div');
+    d.className = 'chip';
+    d.textContent = `${label}: ${val}`;
+    return d;
+  };
+  kpiWrap.appendChild(createChip('Pending', pending));
+  kpiWrap.appendChild(createChip('Dalam (Checked In)', checkedIn));
+  kpiWrap.appendChild(createChip('Keluar (Checked Out)', checkedOut));
+}
+
+/* Render into a container (table mobile-friendly) */
+function renderList(rows, containerEl, compact=false){
+  if (!rows.length) { containerEl.innerHTML = '<div class="small">Tiada rekod</div>'; return; }
+  const wrap = document.createElement('div');
+  wrap.className = 'table-wrap';
   const table = document.createElement('table');
   table.className = 'table';
-  table.innerHTML = `<thead><tr><th>Nama Pelawat</th><th>Unit / Tuan Rumah</th><th>Kategori</th><th>ETA</th><th>ETD</th><th>Kenderaan</th><th>Status</th><th>Aksi</th></tr></thead>`;
+  const thead = document.createElement('thead');
+  thead.innerHTML = `<tr><th>Nama Pelawat</th><th>Unit / Tuan Rumah</th><th>ETA</th><th>ETD</th><th>Kenderaan</th><th>Status</th><th>Aksi</th></tr>`;
+  table.appendChild(thead);
   const tbody = document.createElement('tbody');
+
   rows.forEach(r => {
     let vehicleDisplay = '-';
     if (Array.isArray(r.vehicleNumbers) && r.vehicleNumbers.length) vehicleDisplay = r.vehicleNumbers.join(', ');
     else if (r.vehicleNo) vehicleDisplay = r.vehicleNo;
-    // conflict detection for this row
-    let isConflict = false;
-    for (const ids of conflictMap.values()) if (ids.has(r.id)) { isConflict = true; break; }
+
+    // WhatsApp link for host phone if exists
+    let hostContactHtml = '';
+    if (r.hostName || r.hostPhone) {
+      const phone = (r.hostPhone || '').trim();
+      if (phone) {
+        const normalized = normalizePhoneForWhatsapp(phone);
+        hostContactHtml = `${escapeHtml(r.hostName || '')} • <a class="tel-link" href="${normalized}" target="_blank" rel="noopener noreferrer">${escapeHtml(phone)}</a>`;
+      } else {
+        hostContactHtml = escapeHtml(r.hostName || '');
+      }
+    }
+
     const statusClass = r.status === 'Checked In' ? 'pill-in' : (r.status === 'Checked Out' ? 'pill-out' : 'pill-pending');
     const tr = document.createElement('tr');
-    if (isConflict) tr.classList.add('conflict');
+
     tr.innerHTML = `
-      <td>${r.visitorName || r.name || ''}${r.entryDetails ? '<div class="small">'+ (r.entryDetails || '') +'</div>' : ''}</td>
-      <td>${r.hostUnit || ''}<div class="small">${r.hostName || ''}${r.hostPhone ? ' • ' + r.hostPhone : ''}</div></td>
-      <td>${r.category || ''}</td>
+      <td>${escapeHtml(r.visitorName || '')}${r.entryDetails ? '<div class="small">'+escapeHtml(r.entryDetails || '')+'</div>' : ''}</td>
+      <td>${escapeHtml(r.hostUnit || '')}<div class="small">${hostContactHtml}</div></td>
       <td>${formatDateOnly(r.eta)}</td>
       <td>${formatDateOnly(r.etd)}</td>
-      <td>${vehicleDisplay}</td>
-      <td><span class="status-pill ${statusClass}">${r.status || 'Pending'}</span></td>
+      <td>${escapeHtml(vehicleDisplay)}</td>
+      <td><span class="status-pill ${statusClass}">${escapeHtml(r.status || 'Pending')}</span></td>
       <td>
         <div class="actions">
           <button class="btn" data-action="in" data-id="${r.id}">Check In</button>
@@ -140,12 +220,14 @@ function renderList(rows, conflictMap = new Map()){
     `;
     tbody.appendChild(tr);
   });
-  table.appendChild(tbody);
-  listArea.innerHTML = '';
-  listArea.appendChild(table);
 
-  // attach action handlers
-  listArea.querySelectorAll('button[data-action]').forEach(btn => {
+  table.appendChild(tbody);
+  wrap.appendChild(table);
+  containerEl.innerHTML = '';
+  containerEl.appendChild(wrap);
+
+  // Attach actions with equal button sizes already handled by CSS
+  containerEl.querySelectorAll('button[data-action]').forEach(btn => {
     btn.addEventListener('click', async () => {
       const id = btn.getAttribute('data-id');
       const action = btn.getAttribute('data-action');
@@ -158,6 +240,9 @@ function renderList(rows, conflictMap = new Map()){
 async function doStatusUpdate(docId, newStatus){
   try {
     const ref = doc(window.__FIRESTORE, 'responses', docId);
+    // fetch current doc to include old value in audit (optional)
+    // const snap = await getDoc(ref);
+    // const oldStatus = snap.exists() ? snap.data().status : '';
     await updateDoc(ref, { status: newStatus, updatedAt: serverTimestamp() });
     const auditCol = collection(window.__FIRESTORE, 'audit');
     await addDoc(auditCol, {
@@ -170,14 +255,15 @@ async function doStatusUpdate(docId, newStatus){
       actionId: String(Date.now()),
       notes: ''
     });
-    loadList();
+    toast('Status dikemaskini');
+    loadTodayList();
   } catch (err) {
     console.error('update err', err);
     alert('Gagal kemaskini status. Semak konsol.');
   }
 }
 
-/* ---------- overlap detection ---------- */
+/* ---------- overlap detection (same as previous) ---------- */
 function buildDateRangeFromInput(dateStr){
   if (!dateStr) return null;
   const p = dateStr.split('-');
@@ -224,7 +310,7 @@ async function checkOverlapsAndRender(){
 
     if (!conflicts.length) {
       overlapResultEl.innerHTML = '<div class="msg">Tiada pertindihan nombor kenderaan pada tarikh ini.</div>';
-      renderList(rows, new Map());
+      renderList(rows, listAreaSummary, false);
       return;
     }
 
@@ -235,8 +321,7 @@ async function checkOverlapsAndRender(){
 
     const conflictMap = new Map();
     conflicts.forEach(c => conflictMap.set(c.vehicle, c.docIds));
-    renderList(rows, conflictMap);
-
+    renderList(rows, listAreaSummary, false); // We don't highlight per-vehicle in this simplified render
     // details list
     const detailsWrap = document.createElement('div');
     detailsWrap.style.marginTop = '12px';
@@ -256,6 +341,88 @@ async function checkOverlapsAndRender(){
   }
 }
 
-/* ---------- misc ---------- */
-reloadBtn.addEventListener('click', ()=> loadList());
-loadList();
+/* ---------- CSV export (simple) ---------- */
+async function exportCSVForToday(){
+  const dateStr = filterDate.value || isoDateString(new Date());
+  const d = dateStr.split('-');
+  const from = new Date(parseInt(d[0],10), parseInt(d[1],10)-1, parseInt(d[2],10), 0,0,0,0);
+  const to = new Date(from); to.setDate(to.getDate()+1);
+
+  try {
+    const col = collection(window.__FIRESTORE, 'responses');
+    const q = query(col, where('eta', '>=', Timestamp.fromDate(from)), where('eta', '<', Timestamp.fromDate(to)), orderBy('eta','asc'));
+    const snap = await getDocs(q);
+    const rows = [];
+    snap.forEach(d => rows.push({ id: d.id, ...d.data() }));
+
+    if (!rows.length) { toast('Tiada rekod untuk eksport'); return; }
+
+    const header = ['id','hostUnit','hostName','hostPhone','visitorName','visitorPhone','category','eta','etd','vehicleNo','vehicleNumbers','status'];
+    const csv = [header.join(',')];
+    rows.forEach(r => {
+      const line = [
+        r.id || '',
+        (r.hostUnit||'').replace(/,/g,''),
+        (r.hostName||'').replace(/,/g,''),
+        (r.hostPhone||'').replace(/,/g,''),
+        (r.visitorName||'').replace(/,/g,''),
+        (r.visitorPhone||'').replace(/,/g,''),
+        (r.category||'').replace(/,/g,''),
+        (r.eta && r.eta.toDate) ? r.eta.toDate().toISOString() : '',
+        (r.etd && r.etd.toDate) ? r.etd.toDate().toISOString() : '',
+        (r.vehicleNo||'').replace(/,/g,''),
+        (Array.isArray(r.vehicleNumbers) ? r.vehicleNumbers.join(';') : '').replace(/,/g,''),
+        (r.status||'')
+      ];
+      csv.push(line.map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(','));
+    });
+    const blob = new Blob([csv.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `visitors_${dateStr}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error('export csv err', err);
+    toast('Gagal eksport CSV. Semak konsol.');
+  }
+}
+
+/* ---------- utilities ---------- */
+function escapeHtml(s){ if (!s) return ''; return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function normalizePhoneForWhatsapp(raw){
+  // Accept local Malaysian formats; attempt to normalize to international without plus
+  let p = String(raw).trim();
+  // Remove spaces, dashes, parentheses
+  p = p.replace(/[\s\-().]/g,'');
+  // If starts with 0, replace with 60 (Malaysia). If starts with +, keep the +.
+  if (p.startsWith('+')) return `https://wa.me/${p.replace(/^\+/,'')}`;
+  if (p.startsWith('0')) return `https://wa.me/6${p.replace(/^0+/,'')}`;
+  // fallback: assume already country code
+  return `https://wa.me/${p}`;
+}
+function isoDateString(d){ const dd = String(d.getDate()).padStart(2,'0'); const mm = String(d.getMonth()+1).padStart(2,'0'); const yy = d.getFullYear(); return `${yy}-${mm}-${dd}`; }
+
+/* ---------- page switching ---------- */
+function showPage(key){
+  if (key === 'summary') {
+    document.getElementById('pageSummary').style.display = '';
+    document.getElementById('pageCheckedIn').style.display = 'none';
+    navSummary.classList.add('active'); navCheckedIn.classList.remove('active');
+  } else {
+    document.getElementById('pageSummary').style.display = 'none';
+    document.getElementById('pageCheckedIn').style.display = '';
+    navSummary.classList.remove('active'); navCheckedIn.classList.add('active');
+  }
+}
+
+/* initialize filterDate with today if empty */
+if (!filterDate.value) filterDate.value = isoDateString(new Date());
+
+/* export overlap controls bind (we already add handlers on auth) */
+document.addEventListener('DOMContentLoaded', ()=> {
+  // nothing here; logic attached in onAuthStateChanged injection
+});
