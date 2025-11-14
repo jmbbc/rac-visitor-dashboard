@@ -72,7 +72,7 @@ input, select, textarea, button {
   font-size:14px;
   background:var(--card);
   color:var(--form-text);
-  -webkit-text-fill-color: var(--form-text); /* webkit fix */
+  -webkit-text-fill-color: var(--form-text);
   box-sizing: border-box;
 }
 
@@ -537,4 +537,44 @@ input.mono {
 /* Responsive fallback */
 @media (max-width: 720px) {
   .inline-two .form-row { flex: 1 1 100%; }
+}
+
+/* ===== Fix alignment for inline-two + form.grid rows ===== */
+
+/* Make inline-two cells use the same grid structure as form .form-row */
+.inline-two {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 8px !important;
+  align-items: start !important;
+}
+
+/* Each .form-row inside inline-two should preserve the 2-column label/input layout */
+.inline-two .form-row {
+  display: grid !important;
+  grid-template-columns: 200px 1fr !important;
+  gap: 6px 12px !important;
+  align-items: center !important;
+  margin: 0 0 6px 0 !important;
+}
+
+/* Defensive: ensure label sits in column 1 and inputs in column 2 */
+.inline-two .form-row label { justify-self: end; grid-column: 1 / 2; padding-right: 6px; margin: 0; }
+.inline-two .form-row input,
+.inline-two .form-row select,
+.inline-two .form-row .autocomplete-wrap {
+  grid-column: 2 / 3;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Autocomplete wrapper should not affect layout */
+.inline-two .autocomplete-wrap { width: 100% !important; display: block !important; grid-column: 2 / 3; }
+
+/* If container is narrow, stack to single column */
+@media (max-width: 720px) {
+  .inline-two { grid-template-columns: 1fr !important; }
+  .inline-two .form-row { grid-template-columns: 1fr !important; }
+  .inline-two .form-row label { justify-self: start; margin-bottom: 6px; grid-column: 1 / -1; }
+  .inline-two .form-row input, .inline-two .form-row select { grid-column: 1 / -1; }
 }
