@@ -501,3 +501,40 @@ input.mono {
 
 /* Optional: utility class to force mono on any input */
 .force-mono { font-family: var(--mono-font) !important; font-variant-numeric: tabular-nums !important; }
+
+/* Pastikan setiap form-row dalam dua-kolom selari */
+.inline-two { display: flex; gap: 16px; flex-wrap: wrap; }
+.inline-two .form-row { flex: 1 1 50%; min-width: 240px; box-sizing: border-box; }
+
+/* Standardkan semua input/select untuk lebar penuh dalam cell */
+.form-row input,
+.form-row select,
+.form-row .autocomplete-wrap input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--input-border, #e5e7eb);
+  background: var(--card, #fff);
+  font: inherit;
+  margin: 0;
+}
+
+/* Pastikan autocomplete-wrap tidak ubah susunan lebar input */
+.autocomplete-wrap { width: 100%; display: block; box-sizing: border-box; }
+.autocomplete-wrap input { width: 100%; }
+
+/* Defensive: jika ada label mengambil ruang, jangan bagi label overflow */
+.form-row label { display: block; margin-bottom: 6px; }
+
+/* Jika .form-row menggunakan grid/justify, override supaya item input rata */
+.form-row { align-items: start; }
+
+/* Jika dropdown absolute beri padding pada container supaya tak ubah layout */
+.autocomplete-list { left: 0; right: 0; width: auto; max-width: 100%; box-sizing: border-box; }
+
+/* Responsive fallback */
+@media (max-width: 720px) {
+  .inline-two .form-row { flex: 1 1 100%; }
+}
