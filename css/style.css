@@ -595,3 +595,20 @@ input.mono {
 
 /* WhatsApp tel link small icon spacing */
 .tel-link .wa { margin-left:6px; font-size:13px; color:inherit; }
+
+/* Dashboard modal & small UI additions */
+.modal .card { box-shadow: 0 8px 40px rgba(2,6,23,0.45); }
+.modal input, .modal select { width:100%; padding:8px; margin-top:6px; border-radius:8px; border:1px solid var(--input-border); box-sizing:border-box; }
+.modal .card h3 { margin-top:0; }
+.modal { display:flex; align-items:center; justify-content:center; }
+.modal .card { max-height: 90vh; overflow:auto; }
+
+/* Small visual: edit button style in table */
+button.btn-edit { background: #f59e0b; border:0; color:#fff; font-weight:700; padding:8px 10px; border-radius:8px; }
+
+/* Ensure action buttons are visually consistent */
+.actions button { display:inline-flex; justify-content:center; align-items:center; gap:6px; }
+
+/* Table responsiveness safety */
+.table-wrap { -webkit-overflow-scrolling: touch; }
+
