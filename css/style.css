@@ -835,5 +835,42 @@ input, textarea, select { -webkit-text-size-adjust:100%; -ms-text-size-adjust:10
 /* Defensive: remove inline width overrides that may exist */
 .autocomplete-wrap[style] { width: auto !important; }
 
+/* Normalise autocomplete input to match plain inputs in form rows */
+.inline-two .form-row .autocomplete-wrap,
+.form-row .autocomplete-wrap {
+  display: block !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Make autocomplete input identical to other form inputs */
+.inline-two .form-row .autocomplete-wrap input,
+.form-row .autocomplete-wrap input {
+  width: 100% !important;
+  min-height: 44px !important;
+  padding: 10px 12px !important;
+  border-radius: 8px !important;
+  border: 1px solid var(--input-border) !important;
+  background: var(--card) !important;
+  color: var(--form-text) !important;
+  font-family: var(--ui-font, Inter) !important;
+  font-size: 14px !important;
+  box-sizing: border-box !important;
+}
+
+/* Ensure helper note aligns to second grid column */
+.inline-two .form-row .field-note,
+.form .form-row .field-note {
+  grid-column: 2 / 3;
+  margin-top: 4px;
+}
+
+/* Defensive: remove inline width overrides that may exist */
+.autocomplete-wrap[style] { width: auto !important; }
+
+/* Hide suggestion list until populated to avoid visual shift */
+.autocomplete-list[hidden] { display: none !important; }
+
 /* Optional: mono style for unit (if you want) */
-/* .input-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", monospace !important; letter-spacing:0.02em; } */
+.input-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", monospace !important; letter-spacing:0.02em; }
+
