@@ -1,5 +1,5 @@
 <!doctype html>
-<html>
+<html lang="ms">
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
@@ -8,15 +8,67 @@
 </head>
 <body>
   <main class="card container">
-    <h1>Banjaria Court Visitor System</h1>
-    <p>Pilih aplikasi:</p>
-    <ul>
-      <li><a href="visitor.html">Borang Daftar Pelawat (Penghuni / Pelawat)</a></li>
-      <li><a href="dashboard.html">Dashboard Keselamatan (Log masuk diperlukan)</a></li>
-    </ul>
+    <header class="home-header">
+      <div class="brand">
+        <svg width="40" height="40" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <circle cx="12" cy="12" r="11" fill="#0b1220"/>
+          <rect x="7" y="7" width="2" height="6" fill="#fff"/>
+          <rect x="11" y="5" width="2" height="8" fill="#fff"/>
+          <rect x="15" y="9" width="2" height="4" fill="#fff"/>
+        </svg>
+        <div>
+          <h1 class="site-title">Banjaria Court</h1>
+          <p class="site-sub">Visitor System</p>
+        </div>
+      </div>
+
+      <div class="meta">
+        <div class="date" aria-hidden="true" id="currentDate">—</div>
+      </div>
+    </header>
+
+    <section class="intro">
+      <p>Pilih aplikasi. Ketuk kad untuk mula.</p>
+    </section>
+
+    <section class="grid-cards" role="list" aria-label="Aplikasi">
+      <a class="img-card" href="visitor.html" role="listitem" aria-label="Borang Daftar Pelawat — buka borang pelawat">
+        <div class="img-wrap" aria-hidden="true">
+          <img src="assets/visitor-thumb.jpg" alt="Thumbnail Borang Daftar Pelawat" loading="lazy">
+        </div>
+        <div class="img-meta">
+          <h4 class="img-title">Borang Daftar Pelawat</h4>
+          <p class="img-sub">Isi maklumat penghuni atau pelawat</p>
+        </div>
+      </a>
+
+      <a class="img-card" href="dashboard.html" role="listitem" aria-label="Dashboard Keselamatan — buka dashboard">
+        <div class="img-wrap" aria-hidden="true">
+          <img src="assets/dashboard-thumb.jpg" alt="Thumbnail Dashboard Keselamatan" loading="lazy">
+        </div>
+        <div class="img-meta">
+          <h4 class="img-title">Dashboard Keselamatan</h4>
+          <p class="img-sub">Semak log dan status keselamatan</p>
+        </div>
+      </a>
+
+      <!-- Tambah kad lain ikut format di atas jika perlu -->
+    </section>
+
     <hr/>
-    <small>Built for Banjaria Court — starter template</small>
+
+    <footer class="home-footer">
+      <small>Built for Banjaria Court — starter template</small>
+    </footer>
   </main>
+
+  <script>
+    // simple date display (localised)
+    document.addEventListener('DOMContentLoaded', () => {
+      const d = new Date();
+      const opts = { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' };
+      document.getElementById('currentDate').textContent = d.toLocaleDateString('ms-MY', opts);
+    });
+  </script>
 </body>
 </html>
-
