@@ -1,4 +1,4 @@
-// js/dashboard.js (module) - complete patched version with edit modal and checked-in minimal columns
+// js/dashboard.js (module) - patched version with category column + badges
 import {
   collection, query, where, getDocs, orderBy, doc, updateDoc, serverTimestamp, addDoc, Timestamp, getDoc
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
@@ -179,15 +179,61 @@ function renderKPIs(pending, checkedIn, checkedOut){
   kpiWrap.appendChild(createChip('Keluar (Checked Out)', checkedOut));
 }
 
-/* General render for summary (full columns) */
+/* ---------- Category helpers & badge map ---------- */
+
+// determineCategory: returns Malay label for category
+function determineCategory(r){
+  if (r.category) {
+    const k = String(r.category).toLowerCase();
+    if (k.includes('contract') || k.includes('kontraktor')) return 'Kontraktor';
+    if (k.includes('move') || k.includes('pindah')) return 'Pindah barang';
+    if (k.includes('deliver') || k.includes('penghantaran')) return 'Penghantaran Barang';
+    if (k.includes('vip') || k.includes('pelawat khas') || k.includes('special')) return 'Pelawat Khas';
+    if (k.includes('resident') || k.includes('penghuni') || k.includes('owner') || k.includes('tenant')) return 'Penghuni';
+    return String(r.category);
+  }
+  const note = (r.note || '').toString().toLowerCase();
+  const role = (r.role || '').toString().toLowerCase();
+  const vehicle = (Array.isArray(r.vehicleNumbers) ? r.vehicleNumbers.join(' ') : (r.vehicleNo || '')).toString().toLowerCase();
+
+  if (/kontraktor|contractor|construction/i.test(note + ' ' + role)) return 'Kontraktor';
+  if (/pindah|move out|moving|moved/i.test(note + ' ' + role)) return 'Pindah barang';
+  if (/delivery|penghantaran|deliver|food|grab|foodpanda|lalamove/i.test(note + ' ' + role)) return 'Penghantaran Barang';
+  if (/pelawat khas|vip|v\.i\.p|special guest/i.test(note + ' ' + role)) return 'Pelawat Khas';
+  if (vehicle && vehicle.trim()) return 'Kenderaan';
+  if (r.isResident || /penghuni|resident|owner|tenant/i.test(role + ' ' + note)) return 'Penghuni';
+  return 'Pelawat';
+}
+
+// Badge class map (kategori label -> css class). Ensure matching CSS in style.css
+const categoryClassMap = {
+  'Pelawat': 'cat-pelawat',
+  'Kontraktor': 'cat-kontraktor',
+  'Pindah barang': 'cat-pindah',
+  'Pelawat Khas': 'cat-pelawat-khas',
+  'Penghantaran Barang': 'cat-penghantaran',
+  'Kenderaan': 'cat-lain',
+  'Penghuni': 'cat-lain'
+};
+
+/* General render for summary (full columns) with Kategori column + badges */
 function renderList(rows, containerEl, compact=false){
-  if (!rows.length) { containerEl.innerHTML = '<div class="small">Tiada rekod</div>'; return; }
+  if (!rows || !rows.length) { containerEl.innerHTML = '<div class="small">Tiada rekod</div>'; return; }
   const wrap = document.createElement('div');
   wrap.className = 'table-wrap';
   const table = document.createElement('table');
   table.className = 'table';
   const thead = document.createElement('thead');
-  thead.innerHTML = `<tr><th>Nama Pelawat</th><th>Unit / Tuan Rumah</th><th>ETA</th><th>ETD</th><th>Kenderaan</th><th>Status</th><th>Aksi</th></tr>`;
+  thead.innerHTML = `<tr>
+    <th>Nama Pelawat</th>
+    <th>Unit / Tuan Rumah</th>
+    <th>ETA</th>
+    <th>ETD</th>
+    <th>Kenderaan</th>
+    <th>Kategori</th>
+    <th>Status</th>
+    <th>Aksi</th>
+  </tr>`;
   table.appendChild(thead);
   const tbody = document.createElement('tbody');
 
@@ -207,15 +253,21 @@ function renderList(rows, containerEl, compact=false){
       }
     }
 
+    // determine category for display (no filtering)
+    const categoryDisplay = determineCategory(r);
+    const catClass = categoryClassMap[categoryDisplay] || 'cat-lain';
+
     const statusClass = r.status === 'Checked In' ? 'pill-in' : (r.status === 'Checked Out' ? 'pill-out' : 'pill-pending');
     const tr = document.createElement('tr');
 
+    // Build inner HTML with category badge cell
     tr.innerHTML = `
       <td>${escapeHtml(r.visitorName || '')}${r.entryDetails ? '<div class="small">'+escapeHtml(r.entryDetails || '')+'</div>' : ''}</td>
       <td>${escapeHtml(r.hostUnit || '')}<div class="small">${hostContactHtml}</div></td>
       <td>${formatDateOnly(r.eta)}</td>
       <td>${formatDateOnly(r.etd)}</td>
       <td>${escapeHtml(vehicleDisplay)}</td>
+      <td><span class="cat-badge ${catClass}">${escapeHtml(categoryDisplay)}</span></td>
       <td><span class="status-pill ${statusClass}">${escapeHtml(r.status || 'Pending')}</span></td>
       <td>
         <div class="actions">
