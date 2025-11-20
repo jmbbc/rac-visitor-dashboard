@@ -982,3 +982,25 @@ input, textarea, select { -webkit-text-size-adjust:100%; -ms-text-size-adjust:10
 /* fallback skeleton color while images load */
 .img-wrap { background:var(--muted); }
 
+/* Kategori badge untuk table */
+.cat-badge {
+  display:inline-block;
+  padding:4px 8px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:700;
+  color:#fff;
+  text-transform:none;
+}
+
+/* warna kategori */
+.cat-pelawat { background:#2563eb; }        /* biru */
+.cat-kontraktor { background:#f59e0b; }     /* oren */
+.cat-pindah { background:#ef4444; }         /* merah */
+.cat-pelawat-khas { background:#6d28d9; }   /* ungu */
+.cat-penghantaran { background:#10b981; }   /* hijau */
+.cat-lain { background:#6b7280; }           /* kelabu untuk fallback */
+
+/* Small muted style for category cell if you prefer text-only fallback */
+.td-category-small { color:var(--muted); font-size:13px; font-weight:600; }
+
