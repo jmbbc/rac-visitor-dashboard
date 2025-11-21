@@ -573,35 +573,3 @@ button:focus, input:focus, select:focus, textarea:focus{
 
 /* Prevent accidental input scaling on iOS */
 input, textarea, select { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
-
-/* Tight card untuk keseragaman padding antara kad */
-.card-tight { padding: 16px !important; border-radius: 10px !important; }
-
-/* Header laporan parkir */
-.parking-header {
-  display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px;
-}
-.parking-header .ph-item { display:flex; flex-direction:column; gap:4px; }
-.parking-header .ph-value { font-weight:800; font-size:15px; }
-.parking-header .ph-grow { flex:1; min-width:220px; }
-.parking-header input { min-height:42px; }
-
-/* Grid dua kolum */
-.parking-grid {
-  display:grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  align-items:start;
-}
-@media (max-width:860px){
-  .parking-grid { grid-template-columns: 1fr; }
-}
-
-/* Judul & teks panjang slot */
-.parking-title { margin:0 0 8px 0; font-size:16px; }
-.parking-slot .meta { gap:10px; min-width:0; }
-.parking-slot .meta .slot-num { width:44px; min-width:44px; }
-.parking-slot .meta .slot-info { display:flex; flex-direction:column; gap:2px; min-width:0; }
-.parking-slot .meta .slot-info .small { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.parking-slot .slot-info { word-break: break-word; overflow-wrap: anywhere; }
-
