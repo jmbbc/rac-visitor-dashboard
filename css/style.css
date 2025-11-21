@@ -1004,3 +1004,26 @@ input, textarea, select { -webkit-text-size-adjust:100%; -ms-text-size-adjust:10
 /* Small muted style for category cell if you prefer text-only fallback */
 .td-category-small { color:var(--muted); font-size:13px; font-weight:600; }
 
+/* Parking report styles */
+.parking-list { display:flex; flex-direction:column; gap:8px; margin-top:8px; }
+.parking-slot {
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  padding:8px; border-radius:8px; border:1px solid var(--input-border); background:var(--surface);
+}
+.parking-slot .meta { display:flex; gap:8px; align-items:center; }
+.parking-slot .meta .slot-num { font-weight:800; width:40px; text-align:center; }
+.parking-slot .meta .slot-info { font-size:13px; color:var(--text-muted); }
+.parking-slot .actions { display:flex; gap:8px; }
+.parking-empty { color:var(--text-muted); font-size:13px; }
+
+/* small responsive tweak */
+@media (max-width:900px){
+  #pageParking { padding-bottom:120px; } /* avoid overlap with mobile controls */
+  .parking-slot .meta .slot-info { display:none; } /* simplified mobile view */
+}
+
+/* highlight filled slot */
+.parking-slot.filled { border-color: rgba(37,99,235,0.12); box-shadow: var(--elev-2); }
+
+/* ensure modal visible focus */
+#parkingSlotModal .card { position:relative; }
