@@ -618,3 +618,235 @@ if (!filterDate.value) filterDate.value = isoDateString(new Date());
 
 /* DOM ready (no-op) */
 document.addEventListener('DOMContentLoaded', ()=>{ /* ready */ });
+
+/* Parking report module */
+(async function initParkingModule(){
+  // DOM
+  const navParking = document.getElementById('navParking');
+  const pageParking = document.getElementById('pageParking');
+  const parkingDateLabel = document.getElementById('parkingDateLabel');
+  const parkingPKName = document.getElementById('parkingPKName');
+  const parkingMasuk = document.getElementById('parkingMasuk');
+  const parkingLuar = document.getElementById('parkingLuar');
+  const parkingSaveAll = document.getElementById('parkingSaveAll');
+
+  const modal = document.getElementById('parkingSlotModal');
+  const closeParkingModal = document.getElementById('closeParkingModal');
+  const cancelSlotBtn = document.getElementById('cancelSlotBtn');
+  const saveSlotBtn = document.getElementById('saveSlotBtn');
+  const clearSlotBtn = document.getElementById('clearSlotBtn');
+  const slotNumberEl = document.getElementById('slotNumber');
+  const slotVehicleEl = document.getElementById('slotVehicle');
+  const slotUnitEl = document.getElementById('slotUnit');
+  const slotETAEl = document.getElementById('slotETA');
+  const slotETDEl = document.getElementById('slotETD');
+  const slotDocIdEl = document.getElementById('slotDocId');
+
+  // Define slot lists
+  const masukSlots = Array.from({length:19}, (_,i)=> String(i+1).padStart(2,'0')); // "01".."19"
+  const luarSlots = Array.from({length:19}, (_,i)=> String(40 + i)); // "40".."58"
+
+  // In-memory cache of slot docs for current date: { slotId: { vehicle, unit, eta, etd, docId } }
+  let slotCache = {};
+
+  // Helper: format date label
+  function setParkingDate(dateStr){
+    const d = dateStr ? new Date(dateStr) : new Date();
+    parkingDateLabel.textContent = formatDateOnly(d);
+  }
+
+  // Show / hide page handlers
+  if (navParking) navParking.addEventListener('click', ()=> {
+    showPage('summary'); // keep other nav deactivated
+    // show parking page
+    document.getElementById('pageSummary').style.display = 'none';
+    document.getElementById('pageCheckedIn').style.display = 'none';
+    pageParking.style.display = '';
+    // set date label from filterDate
+    setParkingDate(filterDate.value || isoDateString(new Date()));
+    loadParkingForDate(filterDate.value || isoDateString(new Date()));
+  });
+
+  // Close modal handlers
+  [closeParkingModal, cancelSlotBtn].forEach(b => b && b.addEventListener('click', ()=> { modal.classList.add('hidden'); modal.setAttribute('aria-hidden','true'); }));
+
+  // Open edit modal for slot
+  function openSlotModal(slotId){
+    const data = slotCache[slotId] || {};
+    slotNumberEl.value = slotId;
+    slotVehicleEl.value = data.vehicle || '';
+    slotUnitEl.value = data.unit || '';
+    slotETAEl.value = data.eta || '';
+    slotETDEl.value = data.etd || '';
+    slotDocIdEl.value = data.docId || '';
+    modal.classList.remove('hidden'); modal.setAttribute('aria-hidden','false');
+    slotVehicleEl.focus();
+  }
+
+  // Render single slot row
+  function renderSlotRow(slotId, container){
+    const data = slotCache[slotId] || {};
+    const div = document.createElement('div');
+    div.className = 'parking-slot' + (data.vehicle ? ' filled' : '');
+    div.dataset.slot = slotId;
+    div.innerHTML = `
+      <div class="meta">
+        <div class="slot-num">${escapeHtml(slotId)}</div>
+        <div class="slot-info">
+          <div class="small">${data.vehicle ? escapeHtml(data.vehicle) : '<span class="parking-empty">Kosong</span>'}</div>
+          <div class="small">${data.unit ? escapeHtml(data.unit) : ''} ${data.eta ? '• '+escapeHtml(data.eta) : ''} ${data.etd ? '• '+escapeHtml(data.etd) : ''}</div>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-edit-slot" data-slot="${escapeHtml(slotId)}">Edit</button>
+      </div>
+    `;
+    // click edit
+    div.querySelector('.btn-edit-slot').addEventListener('click', (e)=> {
+      openSlotModal(slotId);
+    });
+    container.appendChild(div);
+  }
+
+  // Render all slots
+  function renderAllSlots(){
+    parkingMasuk.innerHTML = '';
+    parkingLuar.innerHTML = '';
+    masukSlots.forEach(s => renderSlotRow(s, parkingMasuk));
+    luarSlots.forEach(s => renderSlotRow(s, parkingLuar));
+  }
+
+  // Load parking slots from Firestore for the given date
+  async function loadParkingForDate(dateStr){
+    slotCache = {}; // reset
+    // try to read docs from collection 'parkingSlots' where date == dateStr
+    try {
+      const colRef = collection(window.__FIRESTORE, 'parkingSlots');
+      // Query by date field stored as string 'YYYY-MM-DD' or stored as date -> adjust accordingly
+      // We'll fetch all docs with field date == dateStr (string). If you store Date/Timestamp instead, adapt query.
+      const q = query(colRef, where('date','==', dateStr || isoDateString(new Date())));
+      const snap = await getDocs(q);
+      snap.forEach(d => {
+        const p = d.data();
+        if (!p || !p.slot) return;
+        slotCache[p.slot] = {
+          vehicle: p.vehicle || '',
+          unit: p.unit || '',
+          eta: p.eta || '',
+          etd: p.etd || '',
+          docId: d.id
+        };
+      });
+    } catch (err) {
+      console.warn('loadParkingForDate: failed to query parkingSlots; falling back to empty cache', err);
+    }
+
+    // Render
+    renderAllSlots();
+  }
+
+  // Save a single slot to Firestore (create or update)
+  async function saveSlot(slotId, payload){
+    try {
+      const colRef = collection(window.__FIRESTORE, 'parkingSlots');
+      // If docId exists, update
+      const existing = slotCache[slotId] && slotCache[slotId].docId ? slotCache[slotId].docId : null;
+      if (existing) {
+        const refDoc = doc(window.__FIRESTORE, 'parkingSlots', existing);
+        await updateDoc(refDoc, payload);
+      } else {
+        // create with slot and date
+        const toCreate = Object.assign({ slot: slotId, date: filterDate.value || isoDateString(new Date()) }, payload);
+        const created = await addDoc(colRef, toCreate);
+        slotCache[slotId] = Object.assign({}, payload, { docId: created.id });
+      }
+      // update local cache & re-render slot
+      slotCache[slotId] = Object.assign({}, slotCache[slotId] || {}, payload);
+      renderAllSlots();
+      toast('Slot disimpan');
+      // write audit
+      if (typeof writeAudit === 'function') writeAudit('parking_slot_save', { rowId: slotId, meta: payload, note: `slot ${slotId}` });
+    } catch (err) {
+      console.error('saveSlot err', err);
+      alert('Gagal simpan slot. Semak konsol.');
+    }
+  }
+
+  // Save all slots (bulk): currently it writes PK name and leaves slot docs alone
+  parkingSaveAll.addEventListener('click', async ()=> {
+    // persist PK name optionally in a single doc
+    try {
+      const pkName = parkingPKName.value.trim();
+      const metaCol = collection(window.__FIRESTORE, 'parkingMeta');
+      // simple design: doc id per date
+      const docId = `meta-${filterDate.value || isoDateString(new Date())}`;
+      // attempt to update existing doc, otherwise create (using addDoc not suitable for custom id)
+      try {
+        const refDoc = doc(window.__FIRESTORE, 'parkingMeta', docId);
+        await updateDoc(refDoc, { pkName, updatedAt: serverTimestamp() });
+      } catch (e) {
+        // create with set via addDoc? use addDoc to create no custom id; to keep stable id you'd normally use setDoc; 
+        // fallback: addDoc with explicit date field
+        await addDoc(collection(window.__FIRESTORE, 'parkingMeta'), { date: filterDate.value || isoDateString(new Date()), pkName, createdAt: serverTimestamp() });
+      }
+      toast('Maklumat ringkasan disimpan');
+      if (typeof writeAudit === 'function') writeAudit('parking_meta_save', { note: `pkName=${pkName}` });
+    } catch (err) {
+      console.error('parkingSaveAll err', err);
+      alert('Gagal simpan ringkasan. Semak konsol.');
+    }
+  });
+
+  // Modal save / clear handlers
+  saveSlotBtn.addEventListener('click', async ()=> {
+    const slotId = slotNumberEl.value;
+    const payload = {
+      vehicle: slotVehicleEl.value.trim() || '',
+      unit: slotUnitEl.value.trim() || '',
+      eta: slotETAEl.value || '',
+      etd: slotETDEl.value || ''
+    };
+    await saveSlot(slotId, payload);
+    modal.classList.add('hidden'); modal.setAttribute('aria-hidden','true');
+  });
+
+  clearSlotBtn.addEventListener('click', async ()=> {
+    // clear slot fields and remove doc if exists
+    const slotId = slotNumberEl.value;
+    const docId = slotCache[slotId] && slotCache[slotId].docId;
+    if (docId) {
+      try {
+        const refDoc = doc(window.__FIRESTORE, 'parkingSlots', docId);
+        await updateDoc(refDoc, { vehicle:'', unit:'', eta:'', etd:'', updatedAt: serverTimestamp() });
+        slotCache[slotId] = { vehicle:'', unit:'', eta:'', etd:'', docId };
+        renderAllSlots();
+        toast('Slot dikosongkan');
+        if (typeof writeAudit === 'function') writeAudit('parking_slot_clear', { rowId: slotId });
+      } catch (err) {
+        console.error('clearSlot err', err);
+        alert('Gagal kosongkan slot. Semak konsol.');
+      }
+    } else {
+      // simply clear local fields
+      slotVehicleEl.value = ''; slotUnitEl.value = ''; slotETAEl.value = ''; slotETDEl.value = '';
+      slotCache[slotId] = { vehicle:'', unit:'', eta:'', etd:'' };
+      renderAllSlots();
+      modal.classList.add('hidden'); modal.setAttribute('aria-hidden','true');
+    }
+  });
+
+  // When date filter changes, reload parking slots if page visible
+  filterDate.addEventListener('change', ()=> {
+    if (pageParking && pageParking.style.display !== 'none') {
+      setParkingDate(filterDate.value);
+      loadParkingForDate(filterDate.value);
+    }
+  });
+
+  // Initialize date label
+  setParkingDate(filterDate.value || isoDateString(new Date()));
+
+  // Expose for debugging / external use
+  window.loadParkingForDate = loadParkingForDate;
+})();
+
