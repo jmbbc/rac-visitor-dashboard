@@ -1,8 +1,7 @@
-// js/dashboard.js (module) - patched version with category column + badges
+// js/dashboard.js — main updated with category badges + parking submenu (20/11/25 baseline + patches)
 import {
   collection, query, where, getDocs, orderBy, doc, updateDoc, serverTimestamp, addDoc, Timestamp, getDoc
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-
 import {
   signInWithEmailAndPassword, signOut, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
@@ -19,6 +18,15 @@ function formatDateOnly(ts){
 function isoDateString(d){ const dd = String(d.getDate()).padStart(2,'0'); const mm = String(d.getMonth()+1).padStart(2,'0'); const yy = d.getFullYear(); return `${yy}-${mm}-${dd}`; }
 function showLoginMsg(el, m, ok=true){ el.textContent = m; el.style.color = ok ? 'green' : 'red'; }
 function toast(msg){ const t = document.createElement('div'); t.className = 'msg'; t.textContent = msg; document.body.appendChild(t); setTimeout(()=>t.remove(),3000); }
+function escapeHtml(s){ if (!s) return ''; return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function normalizePhoneForWhatsapp(raw){
+  let p = String(raw || '').trim();
+  p = p.replace(/[\s\-().]/g,'');
+  if (!p) return '#';
+  if (p.startsWith('+')) return `https://wa.me/${p.replace(/^\+/,'')}`;
+  if (p.startsWith('0')) return `https://wa.me/6${p.replace(/^0+/,'')}`;
+  return `https://wa.me/${p}`;
+}
 
 /* ---------- DOM refs ---------- */
 const loginBox = document.getElementById('loginBox');
@@ -38,9 +46,10 @@ const injectedControls = document.getElementById('injectedControls');
 
 const navSummary = document.getElementById('navSummary');
 const navCheckedIn = document.getElementById('navCheckedIn');
+const navParking = document.getElementById('navParking');
 const exportCSVBtn = document.getElementById('exportCSVBtn');
 
-/* injected overlap controls (reused) */
+/* ---------- overlap controls ---------- */
 const overlapWrap = document.createElement('div');
 overlapWrap.className = 'card small';
 overlapWrap.style.margin = '12px 0';
@@ -55,8 +64,8 @@ overlapWrap.innerHTML = `
 `;
 let overlapDateEl, checkOverlapBtn, clearOverlapBtn, overlapResultEl;
 
-/* ---------- debug check ---------- */
-console.info('dashboard.js loaded. window.__AUTH?', !!window.__AUTH, 'window.__FIRESTORE?', !!window.__FIRESTORE);
+/* ---------- debug ---------- */
+console.info('dashboard.js loaded. __AUTH?', !!window.__AUTH, '__FIRESTORE?', !!window.__FIRESTORE);
 
 /* ---------- auth handlers ---------- */
 loginBtn.addEventListener('click', async ()=>{
@@ -65,10 +74,8 @@ loginBtn.addEventListener('click', async ()=>{
   showLoginMsg(loginMsg, 'Log masuk...');
   try {
     const cred = await signInWithEmailAndPassword(window.__AUTH, email, pass);
-    console.info('Login success:', cred.user && (cred.user.email || cred.user.uid));
     showLoginMsg(loginMsg, 'Berjaya log masuk.');
   } catch (err) {
-    console.error('login err detailed', err);
     const code = err && err.code ? err.code : 'unknown_error';
     const msg = err && err.message ? err.message : String(err);
     showLoginMsg(loginMsg, `Gagal log masuk: ${code} — ${msg}`, false);
@@ -80,14 +87,12 @@ logoutBtn.addEventListener('click', async ()=> {
     await signOut(window.__AUTH);
     showLoginMsg(loginMsg, 'Anda telah log keluar.', true);
   } catch (err) {
-    console.error('logout err', err);
     showLoginMsg(loginMsg, 'Gagal log keluar', false);
   }
 });
 
-/* ---------- auth state change handling ---------- */
+/* ---------- auth state change ---------- */
 onAuthStateChanged(window.__AUTH, user => {
-  console.info('dashboard: onAuthStateChanged ->', user ? (user.email || user.uid) : 'signed out');
   if (user) {
     loginBox.style.display = 'none';
     dashboardArea.style.display = 'block';
@@ -105,7 +110,6 @@ onAuthStateChanged(window.__AUTH, user => {
       clearOverlapBtn.addEventListener('click', ()=> { overlapDateEl.value=''; overlapResultEl.innerHTML=''; loadTodayList(); });
     }
 
-    // set today's date into filter and label
     const now = new Date();
     todayLabel.textContent = formatDateOnly(now);
     todayTime.textContent = now.toLocaleTimeString();
@@ -125,12 +129,20 @@ async function loadTodayList(){
 }
 
 reloadBtn.addEventListener('click', ()=> loadTodayList());
-filterDate.addEventListener('change', ()=> loadTodayList());
+filterDate.addEventListener('change', ()=> {
+  loadTodayList();
+  // if parking page visible, also refresh its label/data
+  if (document.getElementById('pageParking').style.display !== 'none') {
+    const ds = filterDate.value || isoDateString(new Date());
+    document.getElementById('parkingDateLabel').textContent = formatDateOnly(new Date(ds));
+    if (typeof window.loadParkingForDate === 'function') window.loadParkingForDate(ds);
+  }
+});
 navSummary.addEventListener('click', ()=> { showPage('summary'); });
 navCheckedIn.addEventListener('click', ()=> { showPage('checkedin'); });
 exportCSVBtn.addEventListener('click', ()=> { exportCSVForToday(); });
 
-/* ---------- core fetch for date ---------- */
+/* ---------- core fetch ---------- */
 async function loadListForDateStr(yyyymmdd){
   const d = yyyymmdd.split('-');
   if (d.length !== 3) { listAreaSummary.innerHTML = '<div class="small">Tarikh tidak sah</div>'; return; }
@@ -159,29 +171,21 @@ async function loadListForDateStr(yyyymmdd){
     renderList(rows, listAreaSummary, false);
     renderCheckedInList(rows.filter(r => r.status === 'Checked In'));
   } catch (err) {
-    console.error('loadList err', err);
     listAreaSummary.innerHTML = '<div class="small">Gagal muat. Semak konsol.</div>';
     listAreaCheckedIn.innerHTML = '<div class="small">Gagal muat. Semak konsol.</div>';
   }
 }
 
-/* ---------- render helpers ---------- */
+/* ---------- KPIs ---------- */
 function renderKPIs(pending, checkedIn, checkedOut){
   kpiWrap.innerHTML = '';
-  const createChip = (label, val) => {
-    const d = document.createElement('div');
-    d.className = 'chip';
-    d.textContent = `${label}: ${val}`;
-    return d;
-  };
-  kpiWrap.appendChild(createChip('Pending', pending));
-  kpiWrap.appendChild(createChip('Dalam (Checked In)', checkedIn));
-  kpiWrap.appendChild(createChip('Keluar (Checked Out)', checkedOut));
+  const chip = (label,val)=>{ const d=document.createElement('div'); d.className='chip'; d.textContent=`${label}: ${val}`; return d; };
+  kpiWrap.appendChild(chip('Pending', pending));
+  kpiWrap.appendChild(chip('Dalam (Checked In)', checkedIn));
+  kpiWrap.appendChild(chip('Keluar (Checked Out)', checkedOut));
 }
 
-/* ---------- Category helpers & badge map ---------- */
-
-// determineCategory: returns Malay label for category
+/* ---------- Category ---------- */
 function determineCategory(r){
   if (r.category) {
     const k = String(r.category).toLowerCase();
@@ -195,7 +199,6 @@ function determineCategory(r){
   const note = (r.note || '').toString().toLowerCase();
   const role = (r.role || '').toString().toLowerCase();
   const vehicle = (Array.isArray(r.vehicleNumbers) ? r.vehicleNumbers.join(' ') : (r.vehicleNo || '')).toString().toLowerCase();
-
   if (/kontraktor|contractor|construction/i.test(note + ' ' + role)) return 'Kontraktor';
   if (/pindah|move out|moving|moved/i.test(note + ' ' + role)) return 'Pindah barang';
   if (/delivery|penghantaran|deliver|food|grab|foodpanda|lalamove/i.test(note + ' ' + role)) return 'Penghantaran Barang';
@@ -204,8 +207,6 @@ function determineCategory(r){
   if (r.isResident || /penghuni|resident|owner|tenant/i.test(role + ' ' + note)) return 'Penghuni';
   return 'Pelawat';
 }
-
-// Badge class map (kategori label -> css class). Ensure matching CSS in style.css
 const categoryClassMap = {
   'Pelawat': 'cat-pelawat',
   'Kontraktor': 'cat-kontraktor',
@@ -216,7 +217,7 @@ const categoryClassMap = {
   'Penghuni': 'cat-lain'
 };
 
-/* General render for summary (full columns) with Kategori column + badges */
+/* ---------- Render summary ---------- */
 function renderList(rows, containerEl, compact=false){
   if (!rows || !rows.length) { containerEl.innerHTML = '<div class="small">Tiada rekod</div>'; return; }
   const wrap = document.createElement('div');
@@ -253,14 +254,11 @@ function renderList(rows, containerEl, compact=false){
       }
     }
 
-    // determine category for display (no filtering)
     const categoryDisplay = determineCategory(r);
     const catClass = categoryClassMap[categoryDisplay] || 'cat-lain';
-
     const statusClass = r.status === 'Checked In' ? 'pill-in' : (r.status === 'Checked Out' ? 'pill-out' : 'pill-pending');
-    const tr = document.createElement('tr');
 
-    // Build inner HTML with category badge cell
+    const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${escapeHtml(r.visitorName || '')}${r.entryDetails ? '<div class="small">'+escapeHtml(r.entryDetails || '')+'</div>' : ''}</td>
       <td>${escapeHtml(r.hostUnit || '')}<div class="small">${hostContactHtml}</div></td>
@@ -284,7 +282,6 @@ function renderList(rows, containerEl, compact=false){
   containerEl.innerHTML = '';
   containerEl.appendChild(wrap);
 
-  // Attach actions
   containerEl.querySelectorAll('button[data-action]').forEach(btn => {
     btn.addEventListener('click', async () => {
       const id = btn.getAttribute('data-id');
@@ -294,7 +291,7 @@ function renderList(rows, containerEl, compact=false){
   });
 }
 
-/* ---------- Checked-In page minimal columns & Edit button ---------- */
+/* ---------- Checked-In list ---------- */
 function renderCheckedInList(rows){
   const containerEl = listAreaCheckedIn;
   if (!rows || rows.length === 0) { containerEl.innerHTML = '<div class="small">Tiada rekod</div>'; return; }
@@ -338,7 +335,6 @@ function renderCheckedInList(rows){
   containerEl.innerHTML = '';
   containerEl.appendChild(wrap);
 
-  // Attach actions
   containerEl.querySelectorAll('button[data-action]').forEach(btn => {
     btn.addEventListener('click', async () => {
       const id = btn.getAttribute('data-id');
@@ -347,7 +343,6 @@ function renderCheckedInList(rows){
     });
   });
 
-  // Attach edit buttons
   containerEl.querySelectorAll('button.btn-edit').forEach(btn => {
     btn.addEventListener('click', () => {
       const id = btn.getAttribute('data-id');
@@ -375,12 +370,11 @@ async function doStatusUpdate(docId, newStatus){
     toast('Status dikemaskini');
     loadTodayList();
   } catch (err) {
-    console.error('update err', err);
     alert('Gagal kemaskini status. Semak konsol.');
   }
 }
 
-/* ---------- overlap detection (unchanged) ---------- */
+/* ---------- overlap detection ---------- */
 function buildDateRangeFromInput(dateStr){
   if (!dateStr) return null;
   const p = dateStr.split('-');
@@ -390,7 +384,6 @@ function buildDateRangeFromInput(dateStr){
   const to = new Date(from); to.setDate(to.getDate()+1);
   return { from, to };
 }
-
 async function checkOverlapsAndRender(){
   const dateStr = document.getElementById('overlapDate').value;
   overlapResultEl.innerHTML = '';
@@ -448,7 +441,6 @@ async function checkOverlapsAndRender(){
     });
     overlapResultEl.appendChild(detailsWrap);
   } catch (err) {
-    console.error('check overlap err', err);
     overlapResultEl.innerHTML = '<div class="small">Ralat semasa semakan. Semak konsol.</div>';
   }
 }
@@ -498,23 +490,11 @@ async function exportCSVForToday(){
     a.remove();
     URL.revokeObjectURL(url);
   } catch (err) {
-    console.error('export csv err', err);
     toast('Gagal eksport CSV. Semak konsol.');
   }
 }
 
-/* ---------- utilities ---------- */
-function escapeHtml(s){ if (!s) return ''; return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function normalizePhoneForWhatsapp(raw){
-  let p = String(raw || '').trim();
-  p = p.replace(/[\s\-().]/g,'');
-  if (!p) return '#';
-  if (p.startsWith('+')) return `https://wa.me/${p.replace(/^\+/,'')}`;
-  if (p.startsWith('0')) return `https://wa.me/6${p.replace(/^0+/,'')}`;
-  return `https://wa.me/${p}`;
-}
-
-/* ---------- modal edit: open/close/save ---------- */
+/* ---------- modal edit ---------- */
 async function openEditModalFor(docId){
   try {
     const ref = doc(window.__FIRESTORE, 'responses', docId);
@@ -530,26 +510,17 @@ async function openEditModalFor(docId){
     document.getElementById('editStatus').value = data.status || 'Pending';
     showModal(true);
   } catch (err) {
-    console.error('openEditModalFor err', err);
     alert('Gagal muatkan data. Semak konsol');
   }
 }
-
 function showModal(open){
   const modal = document.getElementById('editModal');
   if (!modal) return;
-  if (open) {
-    modal.classList.remove('hidden');
-    modal.setAttribute('aria-hidden','false');
-  } else {
-    modal.classList.add('hidden');
-    modal.setAttribute('aria-hidden','true');
-  }
+  if (open) { modal.classList.remove('hidden'); modal.setAttribute('aria-hidden','false'); }
+  else { modal.classList.add('hidden'); modal.setAttribute('aria-hidden','true'); }
 }
-
 document.getElementById('closeEditModal').addEventListener('click', ()=> showModal(false));
 document.getElementById('cancelEditBtn').addEventListener('click', ()=> showModal(false));
-
 document.getElementById('saveEditBtn').addEventListener('click', async (ev) => {
   ev.preventDefault();
   const id = document.getElementById('editDocId').value;
@@ -574,7 +545,6 @@ document.getElementById('saveEditBtn').addEventListener('click', async (ev) => {
 
   try {
     const ref = doc(window.__FIRESTORE, 'responses', id);
-    // get old doc for audit
     const oldSnap = await getDoc(ref);
     const oldData = oldSnap.exists() ? oldSnap.data() : null;
     await updateDoc(ref, payload);
@@ -595,7 +565,6 @@ document.getElementById('saveEditBtn').addEventListener('click', async (ev) => {
     showModal(false);
     await loadTodayList();
   } catch (err) {
-    console.error('saveEdit err', err);
     alert('Gagal simpan. Semak konsol.');
   }
 });
@@ -605,24 +574,26 @@ function showPage(key){
   if (key === 'summary') {
     document.getElementById('pageSummary').style.display = '';
     document.getElementById('pageCheckedIn').style.display = 'none';
-    navSummary.classList.add('active'); navCheckedIn.classList.remove('active');
-  } else {
+    document.getElementById('pageParking').style.display = 'none';
+    navSummary.classList.add('active');
+    navCheckedIn.classList.remove('active');
+    if (navParking) navParking.classList.remove('active');
+  } else if (key === 'checkedin') {
     document.getElementById('pageSummary').style.display = 'none';
     document.getElementById('pageCheckedIn').style.display = '';
-    navSummary.classList.remove('active'); navCheckedIn.classList.add('active');
+    document.getElementById('pageParking').style.display = 'none';
+    navSummary.classList.remove('active');
+    navCheckedIn.classList.add('active');
+    if (navParking) navParking.classList.remove('active');
   }
 }
 
 /* initialize filterDate with today if empty */
 if (!filterDate.value) filterDate.value = isoDateString(new Date());
+document.addEventListener('DOMContentLoaded', ()=>{});
 
-/* DOM ready (no-op) */
-document.addEventListener('DOMContentLoaded', ()=>{ /* ready */ });
-
-/* Parking report module */
-(async function initParkingModule(){
-  // DOM
-  const navParking = document.getElementById('navParking');
+/* ---------- Parking report module ---------- */
+(function initParkingModule(){
   const pageParking = document.getElementById('pageParking');
   const parkingDateLabel = document.getElementById('parkingDateLabel');
   const parkingPKName = document.getElementById('parkingPKName');
@@ -642,35 +613,37 @@ document.addEventListener('DOMContentLoaded', ()=>{ /* ready */ });
   const slotETDEl = document.getElementById('slotETD');
   const slotDocIdEl = document.getElementById('slotDocId');
 
-  // Define slot lists
-  const masukSlots = Array.from({length:19}, (_,i)=> String(i+1).padStart(2,'0')); // "01".."19"
-  const luarSlots = Array.from({length:19}, (_,i)=> String(40 + i)); // "40".."58"
+  const masukSlots = Array.from({length:19}, (_,i)=> String(i+1).padStart(2,'0')); // 01..19
+  const luarSlots = Array.from({length:19}, (_,i)=> String(40 + i)); // 40..58
 
-  // In-memory cache of slot docs for current date: { slotId: { vehicle, unit, eta, etd, docId } }
   let slotCache = {};
 
-  // Helper: format date label
   function setParkingDate(dateStr){
     const d = dateStr ? new Date(dateStr) : new Date();
     parkingDateLabel.textContent = formatDateOnly(d);
   }
 
-  // Show / hide page handlers
-  if (navParking) navParking.addEventListener('click', ()=> {
-    showPage('summary'); // keep other nav deactivated
-    // show parking page
-    document.getElementById('pageSummary').style.display = 'none';
-    document.getElementById('pageCheckedIn').style.display = 'none';
-    pageParking.style.display = '';
-    // set date label from filterDate
-    setParkingDate(filterDate.value || isoDateString(new Date()));
-    loadParkingForDate(filterDate.value || isoDateString(new Date()));
-  });
+  // Nav: activate parking page
+  if (navParking) {
+    navParking.addEventListener('click', ()=> {
+      document.getElementById('pageSummary').style.display = 'none';
+      document.getElementById('pageCheckedIn').style.display = 'none';
+      pageParking.style.display = '';
 
-  // Close modal handlers
-  [closeParkingModal, cancelSlotBtn].forEach(b => b && b.addEventListener('click', ()=> { modal.classList.add('hidden'); modal.setAttribute('aria-hidden','true'); }));
+      navSummary.classList.remove('active');
+      navCheckedIn.classList.remove('active');
+      navParking.classList.add('active');
 
-  // Open edit modal for slot
+      const ds = filterDate.value || isoDateString(new Date());
+      setParkingDate(ds);
+      loadParkingForDate(ds);
+    });
+  }
+
+  [closeParkingModal, cancelSlotBtn].forEach(b => b && b.addEventListener('click', ()=> {
+    modal.classList.add('hidden'); modal.setAttribute('aria-hidden','true');
+  }));
+
   function openSlotModal(slotId){
     const data = slotCache[slotId] || {};
     slotNumberEl.value = slotId;
@@ -683,7 +656,6 @@ document.addEventListener('DOMContentLoaded', ()=>{ /* ready */ });
     slotVehicleEl.focus();
   }
 
-  // Render single slot row
   function renderSlotRow(slotId, container){
     const data = slotCache[slotId] || {};
     const div = document.createElement('div');
@@ -694,21 +666,17 @@ document.addEventListener('DOMContentLoaded', ()=>{ /* ready */ });
         <div class="slot-num">${escapeHtml(slotId)}</div>
         <div class="slot-info">
           <div class="small">${data.vehicle ? escapeHtml(data.vehicle) : '<span class="parking-empty">Kosong</span>'}</div>
-          <div class="small">${data.unit ? escapeHtml(data.unit) : ''} ${data.eta ? '• '+escapeHtml(data.eta) : ''} ${data.etd ? '• '+escapeHtml(data.etd) : ''}</div>
+          <div class="small">${data.unit ? escapeHtml(data.unit) : ''}${data.eta ? ' • '+escapeHtml(data.eta) : ''}${data.etd ? ' • '+escapeHtml(data.etd) : ''}</div>
         </div>
       </div>
       <div class="actions">
-        <button class="btn btn-edit-slot" data-slot="${escapeHtml(slotId)}">Edit</button>
+        <button class="btn btn-edit" data-slot="${escapeHtml(slotId)}">Edit</button>
       </div>
     `;
-    // click edit
-    div.querySelector('.btn-edit-slot').addEventListener('click', (e)=> {
-      openSlotModal(slotId);
-    });
+    div.querySelector('.btn-edit').addEventListener('click', ()=> openSlotModal(slotId));
     container.appendChild(div);
   }
 
-  // Render all slots
   function renderAllSlots(){
     parkingMasuk.innerHTML = '';
     parkingLuar.innerHTML = '';
@@ -716,14 +684,10 @@ document.addEventListener('DOMContentLoaded', ()=>{ /* ready */ });
     luarSlots.forEach(s => renderSlotRow(s, parkingLuar));
   }
 
-  // Load parking slots from Firestore for the given date
   async function loadParkingForDate(dateStr){
-    slotCache = {}; // reset
-    // try to read docs from collection 'parkingSlots' where date == dateStr
+    slotCache = {};
     try {
       const colRef = collection(window.__FIRESTORE, 'parkingSlots');
-      // Query by date field stored as string 'YYYY-MM-DD' or stored as date -> adjust accordingly
-      // We'll fetch all docs with field date == dateStr (string). If you store Date/Timestamp instead, adapt query.
       const q = query(colRef, where('date','==', dateStr || isoDateString(new Date())));
       const snap = await getDocs(q);
       snap.forEach(d => {
@@ -738,66 +702,44 @@ document.addEventListener('DOMContentLoaded', ()=>{ /* ready */ });
         };
       });
     } catch (err) {
-      console.warn('loadParkingForDate: failed to query parkingSlots; falling back to empty cache', err);
+      // silent fallback
     }
-
-    // Render
     renderAllSlots();
   }
 
-  // Save a single slot to Firestore (create or update)
   async function saveSlot(slotId, payload){
     try {
       const colRef = collection(window.__FIRESTORE, 'parkingSlots');
-      // If docId exists, update
       const existing = slotCache[slotId] && slotCache[slotId].docId ? slotCache[slotId].docId : null;
       if (existing) {
         const refDoc = doc(window.__FIRESTORE, 'parkingSlots', existing);
-        await updateDoc(refDoc, payload);
+        await updateDoc(refDoc, Object.assign({}, payload, { updatedAt: serverTimestamp() }));
       } else {
-        // create with slot and date
-        const toCreate = Object.assign({ slot: slotId, date: filterDate.value || isoDateString(new Date()) }, payload);
+        const toCreate = Object.assign({ slot: slotId, date: filterDate.value || isoDateString(new Date()) }, payload, { createdAt: serverTimestamp() });
         const created = await addDoc(colRef, toCreate);
         slotCache[slotId] = Object.assign({}, payload, { docId: created.id });
       }
-      // update local cache & re-render slot
       slotCache[slotId] = Object.assign({}, slotCache[slotId] || {}, payload);
       renderAllSlots();
       toast('Slot disimpan');
-      // write audit
       if (typeof writeAudit === 'function') writeAudit('parking_slot_save', { rowId: slotId, meta: payload, note: `slot ${slotId}` });
     } catch (err) {
-      console.error('saveSlot err', err);
       alert('Gagal simpan slot. Semak konsol.');
     }
   }
 
-  // Save all slots (bulk): currently it writes PK name and leaves slot docs alone
   parkingSaveAll.addEventListener('click', async ()=> {
-    // persist PK name optionally in a single doc
     try {
       const pkName = parkingPKName.value.trim();
       const metaCol = collection(window.__FIRESTORE, 'parkingMeta');
-      // simple design: doc id per date
-      const docId = `meta-${filterDate.value || isoDateString(new Date())}`;
-      // attempt to update existing doc, otherwise create (using addDoc not suitable for custom id)
-      try {
-        const refDoc = doc(window.__FIRESTORE, 'parkingMeta', docId);
-        await updateDoc(refDoc, { pkName, updatedAt: serverTimestamp() });
-      } catch (e) {
-        // create with set via addDoc? use addDoc to create no custom id; to keep stable id you'd normally use setDoc; 
-        // fallback: addDoc with explicit date field
-        await addDoc(collection(window.__FIRESTORE, 'parkingMeta'), { date: filterDate.value || isoDateString(new Date()), pkName, createdAt: serverTimestamp() });
-      }
+      await addDoc(metaCol, { date: filterDate.value || isoDateString(new Date()), pkName, createdAt: serverTimestamp() });
       toast('Maklumat ringkasan disimpan');
       if (typeof writeAudit === 'function') writeAudit('parking_meta_save', { note: `pkName=${pkName}` });
     } catch (err) {
-      console.error('parkingSaveAll err', err);
       alert('Gagal simpan ringkasan. Semak konsol.');
     }
   });
 
-  // Modal save / clear handlers
   saveSlotBtn.addEventListener('click', async ()=> {
     const slotId = slotNumberEl.value;
     const payload = {
@@ -811,7 +753,6 @@ document.addEventListener('DOMContentLoaded', ()=>{ /* ready */ });
   });
 
   clearSlotBtn.addEventListener('click', async ()=> {
-    // clear slot fields and remove doc if exists
     const slotId = slotNumberEl.value;
     const docId = slotCache[slotId] && slotCache[slotId].docId;
     if (docId) {
@@ -823,11 +764,9 @@ document.addEventListener('DOMContentLoaded', ()=>{ /* ready */ });
         toast('Slot dikosongkan');
         if (typeof writeAudit === 'function') writeAudit('parking_slot_clear', { rowId: slotId });
       } catch (err) {
-        console.error('clearSlot err', err);
         alert('Gagal kosongkan slot. Semak konsol.');
       }
     } else {
-      // simply clear local fields
       slotVehicleEl.value = ''; slotUnitEl.value = ''; slotETAEl.value = ''; slotETDEl.value = '';
       slotCache[slotId] = { vehicle:'', unit:'', eta:'', etd:'' };
       renderAllSlots();
@@ -835,13 +774,6 @@ document.addEventListener('DOMContentLoaded', ()=>{ /* ready */ });
     }
   });
 
-  // When date filter changes, reload parking slots if page visible
-  filterDate.addEventListener('change', ()=> {
-    if (pageParking && pageParking.style.display !== 'none') {
-      setParkingDate(filterDate.value);
-      loadParkingForDate(filterDate.value);
-    }
-  });
-
-  // Initialize date label
-  setParkingDate(filterDate.value || isoDateString(new Date()));
+  // Expose for external refresh
+  window.loadParkingForDate = loadParkingForDate;
+})();
