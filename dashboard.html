@@ -6,8 +6,6 @@
   <title>Dashboard Keselamatan — Banjaria Court</title>
   <link rel="stylesheet" href="css/style.css">
   <style>
-
-   
     /* Local dashboard tweaks */
     .dashboard-wrap { display: grid; grid-template-columns: 260px 1fr; gap: 16px; align-items: start; }
     @media (max-width: 880px) { .dashboard-wrap { grid-template-columns: 1fr; } }
@@ -42,6 +40,37 @@
 
     /* Modal base (kept minimal; additional styles in css/style.css) */
     .modal.hidden { display:none !important; }
+
+    /* Parking report alignment & grid */
+    .card-tight { padding:16px !important; border-radius:10px !important; }
+    .parking-header { display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px; }
+    .parking-header .ph-item { display:flex; flex-direction:column; gap:4px; }
+    .parking-header .ph-value { font-weight:800; font-size:15px; }
+    .parking-header .ph-grow { flex:1; min-width:220px; }
+    .parking-header input { min-height:42px; }
+
+    .parking-grid { display:grid; grid-template-columns: 1fr 1fr; gap:12px; align-items:start; }
+    @media (max-width:860px){ .parking-grid { grid-template-columns: 1fr; } }
+
+    .parking-title { margin:0 0 8px 0; font-size:16px; }
+    .parking-list { display:flex; flex-direction:column; gap:8px; margin-top:8px; }
+
+    .parking-slot {
+      display:flex; align-items:center; justify-content:space-between; gap:8px;
+      padding:8px; border-radius:8px; border:1px solid var(--input-border); background:var(--card);
+    }
+    .parking-slot .meta { display:flex; gap:10px; align-items:center; min-width:0; }
+    .parking-slot .meta .slot-num { font-weight:800; width:44px; min-width:44px; text-align:center; }
+    .parking-slot .meta .slot-info { font-size:13px; color:var(--muted); display:flex; flex-direction:column; gap:2px; min-width:0; }
+    .parking-slot .meta .slot-info .small { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .parking-slot .actions { display:flex; gap:8px; }
+    .parking-slot.filled { border-color: rgba(37,99,235,0.12); box-shadow: 0 6px 18px rgba(2,6,23,0.08); }
+    .parking-empty { color:var(--muted); font-size:13px; }
+
+    .parking-slot .slot-info { word-break: break-word; overflow-wrap: anywhere; }
+    @media (max-width:640px){ .parking-slot .meta .slot-info .small:nth-child(2){ display:none; } }
+
+    #parkingSlotModal .card { position:relative; }
   </style>
 </head>
 <body>
@@ -78,6 +107,8 @@
             <div class="muted-small">Alat</div>
             <button id="reloadBtn" class="nav-item">Refresh Data</button>
             <button id="exportCSVBtn" class="nav-item">Eksport CSV (hari ini)</button>
+            <!-- Letak nav parking di sini supaya align -->
+            <button id="navParking" class="nav-item">Laporan Parkir Pelawat</button>
           </nav>
         </aside>
 
@@ -106,6 +137,43 @@
           <div id="pageCheckedIn" style="display:none">
             <h3 style="margin-top:6px">Pelawat Checked In — Hari Ini</h3>
             <div id="listAreaCheckedIn" style="margin-top:8px"></div>
+          </div>
+
+          <!-- Halaman Parkir: dua kolum, kad selari -->
+          <div id="pageParking" style="display:none; margin-top:12px;">
+            <div class="card card-tight">
+              <h3 style="margin-top:0">Laporan Parkir Pelawat</h3>
+
+              <div class="parking-header">
+                <div class="ph-item">
+                  <div class="small muted">Tarikh</div>
+                  <div id="parkingDateLabel" class="ph-value"></div>
+                </div>
+                <div class="ph-item">
+                  <div class="small muted">Waktu</div>
+                  <div class="ph-value">12:00 am</div>
+                </div>
+                <div class="ph-item ph-grow">
+                  <label for="parkingPKName" class="small muted">Nama PK</label>
+                  <input id="parkingPKName" placeholder="Nama PK" />
+                </div>
+                <div class="ph-item">
+                  <button id="parkingSaveAll" class="btn">Simpan Semua</button>
+                </div>
+              </div>
+
+              <div class="parking-grid">
+                <div class="card card-tight">
+                  <h4 class="parking-title">Lot Parkir Pelawat Bahagian Masuk</h4>
+                  <div id="parkingMasuk" class="parking-list"></div>
+                </div>
+
+                <div class="card card-tight">
+                  <h4 class="parking-title">Lot Parkir Pelawat Bahagian Luar</h4>
+                  <div id="parkingLuar" class="parking-list"></div>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
       </div>
@@ -138,7 +206,7 @@
           <option value="Checked Out">Checked Out</option>
         </select>
 
-        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
+        <div class="actions" style="justify-content:flex-end;margin-top:12px;">
           <button type="button" id="saveEditBtn" class="btn">Simpan</button>
           <button type="button" id="cancelEditBtn" class="btn-ghost">Batal</button>
         </div>
@@ -147,85 +215,44 @@
     </div>
   </div>
 
-  <!-- 1) Sidebar nav: tambah butang baru -->
-<button id="navParking" class="nav-item">Laporan Parkir Pelawat</button>
+  <!-- Modal edit slot (satu sahaja dalam halaman) -->
+  <div id="parkingSlotModal" class="modal hidden" aria-hidden="true" role="dialog">
+    <div class="card card-tight" style="width:520px;max-width:95%;">
+      <button id="closeParkingModal" style="position:absolute;right:12px;top:12px;border:0;background:transparent;font-size:20px;cursor:pointer">×</button>
+      <h3 style="margin-top:0">Edit Lot Parkir</h3>
+      <form id="parkingSlotForm">
+        <div class="form-row grid">
+          <label>Lot</label>
+          <div><input id="slotNumber" disabled /></div>
+        </div>
+        <div class="form-row grid">
+          <label>Nombor Kenderaan</label>
+          <div><input id="slotVehicle" placeholder="Contoh: ABC1234" class="force-mono" /></div>
+        </div>
+        <div class="form-row grid">
+          <label>Unit Rumah</label>
+          <div><input id="slotUnit" placeholder="Contoh: B1-1-1" /></div>
+        </div>
+        <div class="form-row grid">
+          <label>ETA</label>
+          <div><input id="slotETA" type="date" /></div>
+        </div>
+        <div class="form-row grid">
+          <label>ETD</label>
+          <div><input id="slotETD" type="date" /></div>
+        </div>
 
-<!-- 2) Main: tambah halaman parkir (letakkan sebelum footer main atau selepas pageCheckedIn) -->
-<div id="pageParking" style="display:none; margin-top:12px;">
-  <div class="card">
-    <h3>Laporan Parkir Pelawat</h3>
-    <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px;">
-      <div>
-        <label class="small muted">Tarikh</label>
-        <div id="parkingDateLabel" style="font-weight:800"></div>
-      </div>
-      <div>
-        <label class="small muted">Waktu</label>
-        <div style="font-weight:800">12:00 am</div>
-      </div>
-      <div style="flex:1">
-        <label class="small muted">Nama PK</label>
-        <input id="parkingPKName" placeholder="Nama PK" />
-      </div>
-      <div>
-        <button id="parkingSaveAll" class="btn">Simpan Semua</button>
-      </div>
-    </div>
-
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-      <div class="card" style="padding:12px;">
-        <h4 style="margin-top:0">Lot Parkir Pelawat Bahagian Masuk</h4>
-        <div id="parkingMasuk" class="parking-list"></div>
-      </div>
-
-      <div class="card" style="padding:12px;">
-        <h4 style="margin-top:0">Lot Parkir Pelawat Bahagian Luar</h4>
-        <div id="parkingLuar" class="parking-list"></div>
-      </div>
+        <div class="actions" style="justify-content:flex-end;">
+          <button type="button" id="saveSlotBtn" class="btn">Simpan</button>
+          <button type="button" id="clearSlotBtn" class="btn-ghost">Kosongkan</button>
+          <button type="button" id="cancelSlotBtn" class="btn-ghost">Batal</button>
+        </div>
+        <input type="hidden" id="slotDocId" />
+      </form>
     </div>
   </div>
-</div>
 
-<!-- 3) Modal edit slot -->
-<div id="parkingSlotModal" class="modal hidden" aria-hidden="true" role="dialog">
-  <div class="card" style="width:520px;max-width:95%;">
-    <button id="closeParkingModal" style="position:absolute;right:12px;top:12px;border:0;background:transparent;font-size:20px;cursor:pointer">×</button>
-    <h3 style="margin-top:0">Edit Lot Parkir</h3>
-    <form id="parkingSlotForm">
-      <div class="form-row grid">
-        <label>Lot</label>
-        <div><input id="slotNumber" disabled /></div>
-      </div>
-      <div class="form-row grid">
-        <label>Nombor Kenderaan</label>
-        <div><input id="slotVehicle" placeholder="Contoh: ABC1234" class="force-mono" /></div>
-      </div>
-      <div class="form-row grid">
-        <label>Unit Rumah</label>
-        <div><input id="slotUnit" placeholder="Contoh: B1-1-1" /></div>
-      </div>
-      <div class="form-row grid">
-        <label>ETA</label>
-        <div><input id="slotETA" type="date" /></div>
-      </div>
-      <div class="form-row grid">
-        <label>ETD</label>
-        <div><input id="slotETD" type="date" /></div>
-      </div>
-
-      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
-        <button type="button" id="saveSlotBtn" class="btn">Simpan</button>
-        <button type="button" id="clearSlotBtn" class="btn-ghost">Kosongkan</button>
-        <button type="button" id="cancelSlotBtn" class="btn-ghost">Batal</button>
-      </div>
-      <input type="hidden" id="slotDocId" />
-    </form>
-  </div>
-</div>
-
-  
   <script type="module" src="js/firebase-init.js"></script>
   <script type="module" src="js/dashboard.js"></script>
-  
 </body>
 </html>
