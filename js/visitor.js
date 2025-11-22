@@ -394,6 +394,37 @@ function showSubCategoryHelp() {
   }
 }
 
+/* ---------- WhatsApp quick-send helpers (admin link) ---------- */
+function normalizeForWaLink(raw){
+  if (!raw) return null;
+  let p = String(raw).trim().replace(/[\s\-().]/g,'');
+  if (!p) return null;
+  if (p.startsWith('+')) p = p.replace(/^\+/, '');
+  else if (p.startsWith('0')) p = '6' + p.replace(/^0+/, '');
+  return p; // e.g., 60123456789
+}
+
+function sendWhatsAppToAdmin(payload){
+  const adminNumber = '601172248614'; // updated admin number (Malaysia) without plus
+  const etaText = (payload.eta && payload.eta.toDate) ? payload.eta.toDate().toISOString().slice(0,10) : (payload.eta || '-');
+  const etdText = (payload.etd && payload.etd.toDate) ? payload.etd.toDate().toISOString().slice(0,10) : (payload.etd || '-');
+
+  const lines = [
+    'Pendaftaran Pelawat Baru',
+    `Unit: ${payload.hostUnit || '-'}`,
+    `Host: ${payload.hostName || '-'}`,
+    `Pelawat: ${payload.visitorName || '-'}`,
+    `Tel Pelawat: ${payload.visitorPhone || '-'}`,
+    `ETA: ${etaText}`,
+    `ETD: ${etdText}`,
+    `Kenderaan: ${ (payload.vehicleNumbers && payload.vehicleNumbers.length) ? payload.vehicleNumbers.join('; ') : (payload.vehicleNo || '-') }`,
+    `Kategori: ${payload.category || '-'}`,
+  ];
+  const text = encodeURIComponent(lines.join('\n'));
+  const waUrl = `https://wa.me/${adminNumber}?text=${text}`;
+  window.open(waUrl, '_blank');
+}
+
 /* ---------- main init ---------- */
 document.addEventListener('DOMContentLoaded', () => {
   const input = document.getElementById('hostUnit');
@@ -681,6 +712,10 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         const col = collection(window.__FIRESTORE, 'responses');
         await addDoc(col, payload);
+
+        // QUICK WA: open admin WhatsApp with prefilled summary (user must press Send)
+        try { sendWhatsAppToAdmin(payload); } catch(e) { console.warn('WA open failed', e); }
+
         showStatus('Pendaftaran berjaya. Terima kasih.', true);
         toast('Pendaftaran berjaya', true);
         form.reset();
