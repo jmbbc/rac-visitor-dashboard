@@ -1,6 +1,6 @@
-// js/dashboard.js — main updated with category badges + parking submenu (20/11/25 baseline + patches)
+// js/dashboard.js — patched full version with parking save fixes, deterministic doc IDs, improved logging
 import {
-  collection, query, where, getDocs, orderBy, doc, updateDoc, serverTimestamp, addDoc, Timestamp, getDoc
+  collection, query, where, getDocs, orderBy, doc, updateDoc, serverTimestamp, addDoc, setDoc, Timestamp, getDoc
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 import {
   signInWithEmailAndPassword, signOut, onAuthStateChanged
@@ -74,8 +74,10 @@ loginBtn.addEventListener('click', async ()=>{
   showLoginMsg(loginMsg, 'Log masuk...');
   try {
     const cred = await signInWithEmailAndPassword(window.__AUTH, email, pass);
+    console.info('Login success:', cred.user && (cred.user.email || cred.user.uid));
     showLoginMsg(loginMsg, 'Berjaya log masuk.');
   } catch (err) {
+    console.error('login err detailed', err);
     const code = err && err.code ? err.code : 'unknown_error';
     const msg = err && err.message ? err.message : String(err);
     showLoginMsg(loginMsg, `Gagal log masuk: ${code} — ${msg}`, false);
@@ -87,12 +89,14 @@ logoutBtn.addEventListener('click', async ()=> {
     await signOut(window.__AUTH);
     showLoginMsg(loginMsg, 'Anda telah log keluar.', true);
   } catch (err) {
+    console.error('logout err', err);
     showLoginMsg(loginMsg, 'Gagal log keluar', false);
   }
 });
 
 /* ---------- auth state change ---------- */
 onAuthStateChanged(window.__AUTH, user => {
+  console.info('dashboard: onAuthStateChanged ->', user ? (user.email || user.uid) : 'signed out');
   if (user) {
     loginBox.style.display = 'none';
     dashboardArea.style.display = 'block';
@@ -131,8 +135,7 @@ async function loadTodayList(){
 reloadBtn.addEventListener('click', ()=> loadTodayList());
 filterDate.addEventListener('change', ()=> {
   loadTodayList();
-  // if parking page visible, also refresh its label/data
-  if (document.getElementById('pageParking').style.display !== 'none') {
+  if (document.getElementById('pageParking') && document.getElementById('pageParking').style.display !== 'none') {
     const ds = filterDate.value || isoDateString(new Date());
     document.getElementById('parkingDateLabel').textContent = formatDateOnly(new Date(ds));
     if (typeof window.loadParkingForDate === 'function') window.loadParkingForDate(ds);
@@ -171,6 +174,7 @@ async function loadListForDateStr(yyyymmdd){
     renderList(rows, listAreaSummary, false);
     renderCheckedInList(rows.filter(r => r.status === 'Checked In'));
   } catch (err) {
+    console.error('loadList err', err);
     listAreaSummary.innerHTML = '<div class="small">Gagal muat. Semak konsol.</div>';
     listAreaCheckedIn.innerHTML = '<div class="small">Gagal muat. Semak konsol.</div>';
   }
@@ -370,6 +374,7 @@ async function doStatusUpdate(docId, newStatus){
     toast('Status dikemaskini');
     loadTodayList();
   } catch (err) {
+    console.error('update err', err);
     alert('Gagal kemaskini status. Semak konsol.');
   }
 }
@@ -441,6 +446,7 @@ async function checkOverlapsAndRender(){
     });
     overlapResultEl.appendChild(detailsWrap);
   } catch (err) {
+    console.error('check overlap err', err);
     overlapResultEl.innerHTML = '<div class="small">Ralat semasa semakan. Semak konsol.</div>';
   }
 }
@@ -490,6 +496,7 @@ async function exportCSVForToday(){
     a.remove();
     URL.revokeObjectURL(url);
   } catch (err) {
+    console.error('export csv err', err);
     toast('Gagal eksport CSV. Semak konsol.');
   }
 }
@@ -510,6 +517,7 @@ async function openEditModalFor(docId){
     document.getElementById('editStatus').value = data.status || 'Pending';
     showModal(true);
   } catch (err) {
+    console.error('openEditModalFor err', err);
     alert('Gagal muatkan data. Semak konsol');
   }
 }
@@ -565,6 +573,7 @@ document.getElementById('saveEditBtn').addEventListener('click', async (ev) => {
     showModal(false);
     await loadTodayList();
   } catch (err) {
+    console.error('saveEdit err', err);
     alert('Gagal simpan. Semak konsol.');
   }
 });
@@ -590,9 +599,9 @@ function showPage(key){
 
 /* initialize filterDate with today if empty */
 if (!filterDate.value) filterDate.value = isoDateString(new Date());
-document.addEventListener('DOMContentLoaded', ()=>{});
+document.addEventListener('DOMContentLoaded', ()=>{ /* ready */ });
 
-/* ---------- Parking report module ---------- */
+/* ---------- Parking report module (patched) ---------- */
 (function initParkingModule(){
   const pageParking = document.getElementById('pageParking');
   const parkingDateLabel = document.getElementById('parkingDateLabel');
@@ -616,6 +625,7 @@ document.addEventListener('DOMContentLoaded', ()=>{});
   const masukSlots = Array.from({length:19}, (_,i)=> String(i+1).padStart(2,'0')); // 01..19
   const luarSlots = Array.from({length:19}, (_,i)=> String(40 + i)); // 40..58
 
+  // in-memory cache: { slotId: { vehicle, unit, eta, etd, docId } }
   let slotCache = {};
 
   function setParkingDate(dateStr){
@@ -623,39 +633,36 @@ document.addEventListener('DOMContentLoaded', ()=>{});
     parkingDateLabel.textContent = formatDateOnly(d);
   }
 
-  // Nav: activate parking page
-  if (navParking) {
-    navParking.addEventListener('click', ()=> {
-      document.getElementById('pageSummary').style.display = 'none';
-      document.getElementById('pageCheckedIn').style.display = 'none';
-      pageParking.style.display = '';
-
-      navSummary.classList.remove('active');
-      navCheckedIn.classList.remove('active');
-      navParking.classList.add('active');
-
-      const ds = filterDate.value || isoDateString(new Date());
-      setParkingDate(ds);
-      loadParkingForDate(ds);
-    });
+  // deterministic doc id helper
+  function parkingDocIdFor(dateStr, slotId){
+    const safeDate = dateStr || isoDateString(new Date());
+    return `parking-${safeDate}-${slotId}`;
   }
 
-  [closeParkingModal, cancelSlotBtn].forEach(b => b && b.addEventListener('click', ()=> {
-    modal.classList.add('hidden'); modal.setAttribute('aria-hidden','true');
-  }));
-
-  function openSlotModal(slotId){
-    const data = slotCache[slotId] || {};
-    slotNumberEl.value = slotId;
-    slotVehicleEl.value = data.vehicle || '';
-    slotUnitEl.value = data.unit || '';
-    slotETAEl.value = data.eta || '';
-    slotETDEl.value = data.etd || '';
-    slotDocIdEl.value = data.docId || '';
-    modal.classList.remove('hidden'); modal.setAttribute('aria-hidden','false');
-    slotVehicleEl.focus();
+  // load parking for date
+  async function loadParkingForDate(dateStr){
+    try {
+      console.log('[parking] loadParkingForDate', dateStr);
+      slotCache = {};
+      const from = new Date(dateStr);
+      const to = new Date(from); to.setDate(to.getDate()+1);
+      const col = collection(window.__FIRESTORE, 'parkingSlots');
+      const q = query(col, where('date', '==', dateStr), orderBy('slot','asc'));
+      const snap = await getDocs(q);
+      snap.forEach(d => {
+        const data = d.data();
+        const slotId = data.slot || '';
+        slotCache[slotId] = Object.assign({}, data, { docId: d.id });
+      });
+      console.log('[parking] slotCache loaded', slotCache);
+      renderAllSlots();
+    } catch (err) {
+      console.error('[parking] loadParkingForDate err', err);
+      toast('Gagal muat data parkir. Semak konsol.');
+    }
   }
 
+  // render single slot row
   function renderSlotRow(slotId, container){
     const data = slotCache[slotId] || {};
     const div = document.createElement('div');
@@ -673,107 +680,135 @@ document.addEventListener('DOMContentLoaded', ()=>{});
         <button class="btn btn-edit" data-slot="${escapeHtml(slotId)}">Edit</button>
       </div>
     `;
-    div.querySelector('.btn-edit').addEventListener('click', ()=> openSlotModal(slotId));
+    const btn = div.querySelector('.btn-edit');
+    btn.addEventListener('click', ()=> openSlotModal(slotId));
     container.appendChild(div);
   }
 
+  // render all slots
   function renderAllSlots(){
-    parkingMasuk.innerHTML = '';
-    parkingLuar.innerHTML = '';
-    masukSlots.forEach(s => renderSlotRow(s, parkingMasuk));
-    luarSlots.forEach(s => renderSlotRow(s, parkingLuar));
-  }
-
-  async function loadParkingForDate(dateStr){
-    slotCache = {};
     try {
-      const colRef = collection(window.__FIRESTORE, 'parkingSlots');
-      const q = query(colRef, where('date','==', dateStr || isoDateString(new Date())));
-      const snap = await getDocs(q);
-      snap.forEach(d => {
-        const p = d.data();
-        if (!p || !p.slot) return;
-        slotCache[p.slot] = {
-          vehicle: p.vehicle || '',
-          unit: p.unit || '',
-          eta: p.eta || '',
-          etd: p.etd || '',
-          docId: d.id
-        };
-      });
+      console.log('[parking] renderAllSlots', Object.keys(slotCache).length);
+      parkingMasuk.innerHTML = '';
+      parkingLuar.innerHTML = '';
+      masukSlots.forEach(s => renderSlotRow(s, parkingMasuk));
+      luarSlots.forEach(s => renderSlotRow(s, parkingLuar));
     } catch (err) {
-      // silent fallback
+      console.error('[parking] renderAllSlots err', err);
     }
-    renderAllSlots();
   }
 
+  // open modal for slot
+  function openSlotModal(slotId){
+    const data = slotCache[slotId] || {};
+    slotNumberEl.value = slotId;
+    slotVehicleEl.value = data.vehicle || '';
+    slotUnitEl.value = data.unit || '';
+    slotETAEl.value = data.eta || '';
+    slotETDEl.value = data.etd || '';
+    slotDocIdEl.value = data.docId || '';
+    modal.classList.remove('hidden'); modal.setAttribute('aria-hidden','false');
+    slotVehicleEl.focus();
+  }
+
+  // save single slot (create or merge) using deterministic doc id
   async function saveSlot(slotId, payload){
     try {
-      const colRef = collection(window.__FIRESTORE, 'parkingSlots');
-      const existing = slotCache[slotId] && slotCache[slotId].docId ? slotCache[slotId].docId : null;
-      if (existing) {
-        const refDoc = doc(window.__FIRESTORE, 'parkingSlots', existing);
-        await updateDoc(refDoc, Object.assign({}, payload, { updatedAt: serverTimestamp() }));
-      } else {
-        const toCreate = Object.assign({ slot: slotId, date: filterDate.value || isoDateString(new Date()) }, payload, { createdAt: serverTimestamp() });
-        const created = await addDoc(colRef, toCreate);
-        slotCache[slotId] = Object.assign({}, payload, { docId: created.id });
-      }
-      slotCache[slotId] = Object.assign({}, slotCache[slotId] || {}, payload);
+      console.log('[parking] saveSlot called', slotId, payload);
+      const dateKey = filterDate.value || isoDateString(new Date());
+      const docId = parkingDocIdFor(dateKey, slotId);
+      const ref = doc(window.__FIRESTORE, 'parkingSlots', docId);
+      await setDoc(ref, Object.assign({ slot: slotId, date: dateKey }, payload, { updatedAt: serverTimestamp() }), { merge: true });
+      slotCache[slotId] = Object.assign(slotCache[slotId] || {}, payload, { docId });
+      console.log('[parking] saveSlot success', docId);
       renderAllSlots();
       toast('Slot disimpan');
-      if (typeof writeAudit === 'function') writeAudit('parking_slot_save', { rowId: slotId, meta: payload, note: `slot ${slotId}` });
     } catch (err) {
-      alert('Gagal simpan slot. Semak konsol.');
+      console.error('[parking] saveSlot err', err);
+      alert('Gagal simpan slot. Semak konsol untuk butiran.');
     }
   }
 
-  parkingSaveAll.addEventListener('click', async ()=> {
+  // clear single slot
+  async function clearSlot(slotId){
+    try {
+      console.log('[parking] clearSlot called', slotId);
+      const dateKey = filterDate.value || isoDateString(new Date());
+      const docId = parkingDocIdFor(dateKey, slotId);
+      const ref = doc(window.__FIRESTORE, 'parkingSlots', docId);
+      await setDoc(ref, { slot: slotId, date: dateKey, vehicle:'', unit:'', eta:'', etd:'', updatedAt: serverTimestamp() }, { merge: true });
+      slotCache[slotId] = { vehicle:'', unit:'', eta:'', etd:'', docId };
+      renderAllSlots();
+      toast('Slot dikosongkan');
+    } catch (err) {
+      console.error('[parking] clearSlot err', err);
+      alert('Gagal kosongkan slot. Semak konsol.');
+    }
+  }
+
+  // save parking meta (PK name)
+  async function saveParkingMeta(){
     try {
       const pkName = parkingPKName.value.trim();
-      const metaCol = collection(window.__FIRESTORE, 'parkingMeta');
-      await addDoc(metaCol, { date: filterDate.value || isoDateString(new Date()), pkName, createdAt: serverTimestamp() });
+      const dateKey = filterDate.value || isoDateString(new Date());
+      const metaId = `meta-${dateKey}`;
+      const ref = doc(window.__FIRESTORE, 'parkingMeta', metaId);
+      console.log('[parking] saveParkingMeta', metaId, pkName);
+      await setDoc(ref, { date: dateKey, pkName, updatedAt: serverTimestamp() }, { merge: true });
       toast('Maklumat ringkasan disimpan');
-      if (typeof writeAudit === 'function') writeAudit('parking_meta_save', { note: `pkName=${pkName}` });
     } catch (err) {
+      console.error('[parking] saveParkingMeta err', err);
       alert('Gagal simpan ringkasan. Semak konsol.');
     }
-  });
+  }
 
-  saveSlotBtn.addEventListener('click', async ()=> {
-    const slotId = slotNumberEl.value;
-    const payload = {
-      vehicle: slotVehicleEl.value.trim() || '',
-      unit: slotUnitEl.value.trim() || '',
-      eta: slotETAEl.value || '',
-      etd: slotETDEl.value || ''
-    };
-    await saveSlot(slotId, payload);
-    modal.classList.add('hidden'); modal.setAttribute('aria-hidden','true');
-  });
-
-  clearSlotBtn.addEventListener('click', async ()=> {
-    const slotId = slotNumberEl.value;
-    const docId = slotCache[slotId] && slotCache[slotId].docId;
-    if (docId) {
-      try {
-        const refDoc = doc(window.__FIRESTORE, 'parkingSlots', docId);
-        await updateDoc(refDoc, { vehicle:'', unit:'', eta:'', etd:'', updatedAt: serverTimestamp() });
-        slotCache[slotId] = { vehicle:'', unit:'', eta:'', etd:'', docId };
-        renderAllSlots();
-        toast('Slot dikosongkan');
-        if (typeof writeAudit === 'function') writeAudit('parking_slot_clear', { rowId: slotId });
-      } catch (err) {
-        alert('Gagal kosongkan slot. Semak konsol.');
-      }
-    } else {
-      slotVehicleEl.value = ''; slotUnitEl.value = ''; slotETAEl.value = ''; slotETDEl.value = '';
-      slotCache[slotId] = { vehicle:'', unit:'', eta:'', etd:'' };
-      renderAllSlots();
+  // attach listeners for modal buttons
+  if (saveSlotBtn) {
+    saveSlotBtn.addEventListener('click', async () => {
+      const slotId = slotNumberEl.value;
+      const payload = {
+        vehicle: slotVehicleEl.value.trim() || '',
+        unit: slotUnitEl.value.trim() || '',
+        eta: slotETAEl.value || '',
+        etd: slotETDEl.value || ''
+      };
+      await saveSlot(slotId, payload);
       modal.classList.add('hidden'); modal.setAttribute('aria-hidden','true');
-    }
-  });
+    });
+  }
+  if (clearSlotBtn) {
+    clearSlotBtn.addEventListener('click', async () => {
+      const slotId = slotNumberEl.value;
+      await clearSlot(slotId);
+      modal.classList.add('hidden'); modal.setAttribute('aria-hidden','true');
+    });
+  }
+  if (parkingSaveAll) {
+    parkingSaveAll.addEventListener('click', async () => {
+      await saveParkingMeta();
+    });
+  }
 
-  // Expose for external refresh
+  // nav: activate parking page
+  if (navParking) {
+    navParking.addEventListener('click', ()=> {
+      document.getElementById('pageSummary').style.display = 'none';
+      document.getElementById('pageCheckedIn').style.display = 'none';
+      pageParking.style.display = '';
+
+      navSummary.classList.remove('active');
+      navCheckedIn.classList.remove('active');
+      navParking.classList.add('active');
+
+      const ds = filterDate.value || isoDateString(new Date());
+      setParkingDate(ds);
+      loadParkingForDate(ds);
+    });
+  }
+
+  // close modal handlers
+  [closeParkingModal, cancelSlotBtn].forEach(b => b && b.addEventListener('click', ()=> { modal.classList.add('hidden'); modal.setAttribute('aria-hidden','true'); }));
+
+  // expose loader for external calls (used when filterDate changes)
   window.loadParkingForDate = loadParkingForDate;
 })();
