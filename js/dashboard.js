@@ -99,6 +99,17 @@ function normalizePhoneForWhatsapp(raw){
   return `https://wa.me/${p}`;
 }
 
+/* ---------- Category Mapping (moved early to avoid TDZ) ---------- */
+const categoryClassMap = {
+  'Pelawat': 'cat-pelawat',
+  'Kontraktor': 'cat-kontraktor',
+  'Pindah barang': 'cat-pindah',
+  'Pelawat Khas': 'cat-pelawat-khas',
+  'Penghantaran Barang': 'cat-penghantaran',
+  'Kenderaan': 'cat-lain',
+  'Penghuni': 'cat-lain'
+};
+
 /* ---------- DOM refs ---------- */
 const loginBox = document.getElementById('loginBox');
 const loginBtn = document.getElementById('loginBtn');
@@ -288,15 +299,6 @@ function determineCategory(r){
   if (r.isResident || /penghuni|resident|owner|tenant/i.test(role + ' ' + note)) return 'Penghuni';
   return 'Pelawat';
 }
-const categoryClassMap = {
-  'Pelawat': 'cat-pelawat',
-  'Kontraktor': 'cat-kontraktor',
-  'Pindah barang': 'cat-pindah',
-  'Pelawat Khas': 'cat-pelawat-khas',
-  'Penghantaran Barang': 'cat-penghantaran',
-  'Kenderaan': 'cat-lain',
-  'Penghuni': 'cat-lain'
-};
 
 /* ---------- Render summary ---------- */
 function renderList(rows, containerEl, compact=false, highlightIds = new Set()){
@@ -620,7 +622,8 @@ async function openEditModalFor(docId){
   }
 }
 // Modal helper: open, close, focus trap and restore focus
-let _lastFocusedElement = null;
+// Use 'var' here so the binding is hoisted and not subject to TDZ when modal helpers are invoked
+var _lastFocusedElement = null;
 function _getFocusable(modal){
   const sel = 'a[href], area[href], input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])';
   return Array.from(modal.querySelectorAll(sel)).filter(el => el.offsetParent !== null);
