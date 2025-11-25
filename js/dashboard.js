@@ -1,3 +1,69 @@
+// --- Parking Lot Summary Renderer ---
+function renderParkingLotSummary() {
+  const masukLots = Array.from({length: 19}, (_, i) => String(i+1).padStart(2,'0'));
+  const keluarLots = Array.from({length: 19}, (_, i) => String(i+40));
+  const masukHtml = masukLots.map(lot => `<div class="lot-item">${lot}</div>`).join('');
+  const keluarHtml = keluarLots.map(lot => `<div class="lot-item">${lot}</div>`).join('');
+  const html = `
+    <div class="parking-summary-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px;">
+      <div>
+        <h4 style="margin-bottom:8px">Lot Parkir Pelawat Bahagian Masuk</h4>
+        <div class="lot-list">${masukHtml}</div>
+      </div>
+      <div>
+        <h4 style="margin-bottom:8px">Lot Parkir Pelawat Bahagian Keluar</h4>
+        <div class="lot-list">${keluarHtml}</div>
+      </div>
+    </div>
+  `;
+  const parkingCard = document.querySelector('#pageParking .card.card-tight');
+  if (parkingCard) {
+    parkingCard.insertAdjacentHTML('afterbegin', html);
+  }
+}
+
+// Call summary renderer when parking page is shown
+document.getElementById('navParking').addEventListener('click', () => {
+  setTimeout(renderParkingLotSummary, 100); // ensure DOM is ready
+});
+let lastRowsHash = '';
+let autoRefreshTimer = null;
+
+function hashRows(rows) {
+  // Simple hash: join IDs and length
+  return rows.map(r => r.id).join('-') + ':' + rows.length;
+}
+
+function startAutoRefresh() {
+  if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+  autoRefreshTimer = setInterval(async () => {
+    const dateStr = filterDate.value || isoDateString(new Date());
+    const rows = await fetchRowsForDateStr(dateStr);
+    const newHash = hashRows(rows);
+    if (lastRowsHash && newHash !== lastRowsHash) {
+      toast('Borang baru telah diisi!', true);
+      loadTodayList();
+    }
+    lastRowsHash = newHash;
+  }, 30000); // 30 seconds
+}
+
+async function fetchRowsForDateStr(yyyymmdd){
+  const d = yyyymmdd.split('-');
+  if (d.length !== 3) return [];
+  const from = new Date(parseInt(d[0],10), parseInt(d[1],10)-1, parseInt(d[2],10), 0,0,0,0);
+  const to = new Date(from); to.setDate(to.getDate()+1);
+  try {
+    const col = collection(window.__FIRESTORE, 'responses');
+    const q = query(col, where('eta', '>=', Timestamp.fromDate(from)), where('eta', '<', Timestamp.fromDate(to)), orderBy('eta','asc'));
+    const snap = await getDocs(q);
+    const rows = [];
+    snap.forEach(d => rows.push({ id: d.id, ...d.data() }));
+    return rows;
+  } catch (err) {
+    return [];
+  }
+}
 // js/dashboard.js — full patched version with parking save fixes, deterministic doc IDs, improved logging,
 // and assignLotTransaction (Firestore transaction) for atomic parking assignment.
 
@@ -20,7 +86,9 @@ function formatDateOnly(ts){
 }
 function isoDateString(d){ const dd = String(d.getDate()).padStart(2,'0'); const mm = String(d.getMonth()+1).padStart(2,'0'); const yy = d.getFullYear(); return `${yy}-${mm}-${dd}`; }
 function showLoginMsg(el, m, ok=true){ el.textContent = m; el.style.color = ok ? 'green' : 'red'; }
-function toast(msg){ const t = document.createElement('div'); t.className = 'msg'; t.textContent = msg; document.body.appendChild(t); setTimeout(()=>t.remove(),3000); }
+function toast(msg, ok = true){ const t = document.createElement('div'); t.className = `msg ${ok ? 'ok' : 'err'}`; t.textContent = msg; // a11y
+  t.setAttribute('role','status'); t.setAttribute('aria-live','polite'); t.setAttribute('aria-atomic','true');
+  document.body.appendChild(t); setTimeout(()=>t.remove(),3000); }
 function escapeHtml(s){ if (!s) return ''; return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function normalizePhoneForWhatsapp(raw){
   let p = String(raw || '').trim();
@@ -122,10 +190,12 @@ onAuthStateChanged(window.__AUTH, user => {
     todayTime.textContent = now.toLocaleTimeString();
     if (!filterDate.value) filterDate.value = isoDateString(now);
     loadTodayList();
+    startAutoRefresh();
   } else {
     loginBox.style.display = 'block';
     dashboardArea.style.display = 'none';
     logoutBtn.style.display = 'none';
+    if (autoRefreshTimer) clearInterval(autoRefreshTimer);
   }
 });
 
@@ -155,6 +225,8 @@ async function loadListForDateStr(yyyymmdd){
   const from = new Date(parseInt(d[0],10), parseInt(d[1],10)-1, parseInt(d[2],10), 0,0,0,0);
   const to = new Date(from); to.setDate(to.getDate()+1);
 
+  const spinner = document.getElementById('spinner');
+  if (spinner) spinner.style.display = 'flex';
   listAreaSummary.innerHTML = '<div class="small">Memuat...</div>';
   listAreaCheckedIn.innerHTML = '<div class="small">Memuat...</div>';
   try {
@@ -180,6 +252,8 @@ async function loadListForDateStr(yyyymmdd){
     console.error('loadList err', err);
     listAreaSummary.innerHTML = '<div class="small">Gagal muat. Semak konsol.</div>';
     listAreaCheckedIn.innerHTML = '<div class="small">Gagal muat. Semak konsol.</div>';
+  } finally {
+    if (spinner) spinner.style.display = 'none';
   }
 }
 
@@ -225,7 +299,7 @@ const categoryClassMap = {
 };
 
 /* ---------- Render summary ---------- */
-function renderList(rows, containerEl, compact=false){
+function renderList(rows, containerEl, compact=false, highlightIds = new Set()){
   if (!rows || !rows.length) { containerEl.innerHTML = '<div class="small">Tiada rekod</div>'; return; }
   const wrap = document.createElement('div');
   wrap.className = 'table-wrap';
@@ -266,6 +340,7 @@ function renderList(rows, containerEl, compact=false){
     const statusClass = r.status === 'Checked In' ? 'pill-in' : (r.status === 'Checked Out' ? 'pill-out' : 'pill-pending');
 
     const tr = document.createElement('tr');
+    if (highlightIds && highlightIds.has(r.id)) tr.classList.add('conflict');
     tr.innerHTML = `
       <td>${escapeHtml(r.visitorName || '')}${r.entryDetails ? '<div class="small">'+escapeHtml(r.entryDetails || '')+'</div>' : ''}</td>
       <td>${escapeHtml(r.hostUnit || '')}<div class="small">${hostContactHtml}</div></td>
@@ -394,7 +469,7 @@ async function doStatusUpdate(docId, newStatus){
     await loadTodayList();
   } catch (err) {
     console.error('[status] doStatusUpdate err', err);
-    alert('Gagal kemaskini status. Semak konsol untuk butiran penuh.');
+    toast('Gagal kemaskini status. Semak konsol untuk butiran penuh.');
   }
 }
 
@@ -443,15 +518,18 @@ async function checkOverlapsAndRender(){
 
     if (!conflicts.length) {
       overlapResultEl.innerHTML = '<div class="msg">Tiada pertindihan nombor kenderaan pada tarikh ini.</div>';
-      renderList(rows, listAreaSummary, false);
+      renderList(rows, listAreaSummary, false, new Set());
       return;
     }
 
     let html = '<div class="small" style="margin-bottom:8px">Ditemui pertindihan untuk nombor berikut:</div>';
-    conflicts.forEach(c => { html += `<div style="margin-bottom:6px"><strong>${c.vehicle}</strong> — ${c.docIds.size} rekod</div>`; });
+    conflicts.forEach(c => { html += `<div style="margin-bottom:6px"><strong>${escapeHtml(c.vehicle)}</strong> — ${[...c.docIds].length} rekod</div>`; });
     overlapResultEl.innerHTML = html + '<div class="small" style="margin-top:8px">Baris yang terlibat diserlahkan di table.</div>';
 
-    renderList(rows, listAreaSummary, false);
+    // highlight rows involved in conflicts
+    const conflictIdSet = new Set();
+    conflicts.forEach(c => { (Array.from(c.docIds)).forEach(id => conflictIdSet.add(id)); });
+    renderList(rows, listAreaSummary, false, conflictIdSet);
     const detailsWrap = document.createElement('div');
     detailsWrap.style.marginTop = '12px';
     detailsWrap.innerHTML = '<h4 style="margin:0 0 8px 0">Butiran Pertindihan</h4>';
@@ -460,7 +538,8 @@ async function checkOverlapsAndRender(){
       div.className = 'small';
       div.style.marginBottom = '8px';
       const ids = Array.from(c.docIds);
-      div.innerHTML = `<strong>${c.vehicle}</strong> — ${ids.length} rekod: ${ids.join(', ')}`;
+      const idsText = ids.map(i => escapeHtml(i)).join(', ');
+      div.innerHTML = `<strong>${escapeHtml(c.vehicle)}</strong> — ${ids.length} rekod: ${idsText}`;
       detailsWrap.appendChild(div);
     });
     overlapResultEl.appendChild(detailsWrap);
@@ -525,7 +604,7 @@ async function openEditModalFor(docId){
   try {
     const ref = doc(window.__FIRESTORE, 'responses', docId);
     const snap = await getDoc(ref);
-    if (!snap.exists()) { alert('Rekod tidak ditemui'); return; }
+    if (!snap.exists()) { toast('Rekod tidak ditemui'); return; }
     const data = snap.data();
     document.getElementById('editDocId').value = docId;
     document.getElementById('editUnit').value = data.hostUnit || '';
@@ -534,24 +613,52 @@ async function openEditModalFor(docId){
     const veh = Array.isArray(data.vehicleNumbers) && data.vehicleNumbers.length ? data.vehicleNumbers.join(';') : (data.vehicleNo || '');
     document.getElementById('editVehicle').value = veh;
     document.getElementById('editStatus').value = data.status || 'Pending';
-    showModal(true);
+    openModal(document.getElementById('editModal'), '#saveEditBtn');
   } catch (err) {
     console.error('openEditModalFor err', err);
-    alert('Gagal muatkan data. Semak konsol');
+    toast('Gagal muatkan data. Semak konsol');
   }
 }
-function showModal(open){
-  const modal = document.getElementById('editModal');
-  if (!modal) return;
-  if (open) { modal.classList.remove('hidden'); modal.setAttribute('aria-hidden','false'); }
-  else { modal.classList.add('hidden'); modal.setAttribute('aria-hidden','true'); }
+// Modal helper: open, close, focus trap and restore focus
+let _lastFocusedElement = null;
+function _getFocusable(modal){
+  const sel = 'a[href], area[href], input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  return Array.from(modal.querySelectorAll(sel)).filter(el => el.offsetParent !== null);
 }
-document.getElementById('closeEditModal').addEventListener('click', ()=> showModal(false));
-document.getElementById('cancelEditBtn').addEventListener('click', ()=> showModal(false));
+function openModal(modal, initialFocusSelector){
+  if (!modal) return;
+  _lastFocusedElement = document.activeElement;
+  modal.classList.remove('hidden');
+  modal.setAttribute('aria-hidden','false');
+  // focus
+  const focusBase = initialFocusSelector ? modal.querySelector(initialFocusSelector) : modal.querySelector('button, input, select, textarea');
+  (focusBase || modal).focus();
+  // trap
+  const focusables = _getFocusable(modal);
+  if (focusables.length) {
+    const first = focusables[0]; const last = focusables[focusables.length-1];
+    modal._trapListener = (e) => {
+      if (e.key !== 'Tab') return;
+      if (e.shiftKey) { if (document.activeElement === first) { e.preventDefault(); last.focus(); } }
+      else { if (document.activeElement === last) { e.preventDefault(); first.focus(); } }
+    };
+    modal.addEventListener('keydown', modal._trapListener);
+  }
+}
+function closeModal(modal){
+  if (!modal) return;
+  modal.classList.add('hidden');
+  modal.setAttribute('aria-hidden','true');
+  if (modal._trapListener) { modal.removeEventListener('keydown', modal._trapListener); modal._trapListener = null; }
+  if (_lastFocusedElement && typeof _lastFocusedElement.focus === 'function') _lastFocusedElement.focus();
+  _lastFocusedElement = null;
+}
+document.getElementById('closeEditModal').addEventListener('click', ()=> closeModal(document.getElementById('editModal')));
+document.getElementById('cancelEditBtn').addEventListener('click', ()=> closeModal(document.getElementById('editModal')));
 document.getElementById('saveEditBtn').addEventListener('click', async (ev) => {
   ev.preventDefault();
   const id = document.getElementById('editDocId').value;
-  if (!id) { alert('ID dokumen hilang'); return; }
+  if (!id) { toast('ID dokumen hilang'); return; }
   const unit = document.getElementById('editUnit').value.trim();
   const etaVal = document.getElementById('editETA').value || '';
   const etdVal = document.getElementById('editETD').value || '';
@@ -589,11 +696,11 @@ document.getElementById('saveEditBtn').addEventListener('click', async (ev) => {
     });
 
     toast('Maklumat disimpan');
-    showModal(false);
+    closeModal(document.getElementById('editModal'));
     await loadTodayList();
   } catch (err) {
     console.error('saveEdit err', err);
-    alert('Gagal simpan. Semak konsol.');
+    toast('Gagal simpan. Semak konsol.');
   }
 });
 
@@ -724,8 +831,7 @@ document.addEventListener('DOMContentLoaded', ()=>{ /* ready */ });
     slotETAEl.value = data.eta || '';
     slotETDEl.value = data.etd || '';
     slotDocIdEl.value = data.docId || '';
-    modal.classList.remove('hidden'); modal.setAttribute('aria-hidden','false');
-    slotVehicleEl.focus();
+    openModal(modal, '#slotVehicle');
   }
 
   // save single slot (create or merge) using deterministic doc id
@@ -742,7 +848,7 @@ document.addEventListener('DOMContentLoaded', ()=>{ /* ready */ });
       toast('Slot disimpan');
     } catch (err) {
       console.error('[parking] saveSlot err', err);
-      alert('Gagal simpan slot. Semak konsol untuk butiran.');
+      toast('Gagal simpan slot. Semak konsol untuk butiran.');
     }
   }
 
@@ -759,7 +865,7 @@ document.addEventListener('DOMContentLoaded', ()=>{ /* ready */ });
       toast('Slot dikosongkan');
     } catch (err) {
       console.error('[parking] clearSlot err', err);
-      alert('Gagal kosongkan slot. Semak konsol.');
+      toast('Gagal kosongkan slot. Semak konsol.');
     }
   }
 
@@ -775,7 +881,7 @@ document.addEventListener('DOMContentLoaded', ()=>{ /* ready */ });
       toast('Maklumat ringkasan disimpan');
     } catch (err) {
       console.error('[parking] saveParkingMeta err', err);
-      alert('Gagal simpan ringkasan. Semak konsol.');
+      toast('Gagal simpan ringkasan. Semak konsol.');
     }
   }
 
@@ -790,14 +896,14 @@ document.addEventListener('DOMContentLoaded', ()=>{ /* ready */ });
         etd: slotETDEl.value || ''
       };
       await saveSlot(slotId, payload);
-      modal.classList.add('hidden'); modal.setAttribute('aria-hidden','true');
+      closeModal(modal);
     });
   }
   if (clearSlotBtn) {
     clearSlotBtn.addEventListener('click', async () => {
       const slotId = slotNumberEl.value;
       await clearSlot(slotId);
-      modal.classList.add('hidden'); modal.setAttribute('aria-hidden','true');
+      closeModal(modal);
     });
   }
   if (parkingSaveAll) {
@@ -820,11 +926,14 @@ document.addEventListener('DOMContentLoaded', ()=>{ /* ready */ });
       const ds = filterDate.value || isoDateString(new Date());
       setParkingDate(ds);
       loadParkingForDate(ds);
+
+      // Always render summary when parking page is shown
+      setTimeout(renderParkingLotSummary, 100);
     });
   }
 
   // close modal handlers
-  [closeParkingModal, cancelSlotBtn].forEach(b => b && b.addEventListener('click', ()=> { modal.classList.add('hidden'); modal.setAttribute('aria-hidden','true'); }));
+  [closeParkingModal, cancelSlotBtn].forEach(b => b && b.addEventListener('click', ()=> { closeModal(modal); }));
 
   // expose loader for external calls (used when filterDate changes)
   window.loadParkingForDate = loadParkingForDate;
@@ -931,7 +1040,7 @@ document.addEventListener('DOMContentLoaded', ()=>{ /* ready */ });
       await loadTodayList();
     } catch (err) {
       const msg = err && err.message ? err.message : 'Gagal assign lot';
-      alert(`Gagal assign lot: ${msg}`);
+      toast(`Gagal assign lot: ${msg}`);
     } finally {
       // optional: re-enable UI
     }

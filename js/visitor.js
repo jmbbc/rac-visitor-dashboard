@@ -83,6 +83,10 @@ function waitForFirestore(timeout = 5000){
 function toast(message, ok = true) {
   const el = document.createElement('div');
   el.className = `toast ${ok ? 'ok' : 'err'}`;
+  // accessibility: announce to assistive tech
+  el.setAttribute('role', 'status');
+  el.setAttribute('aria-live', 'polite');
+  el.setAttribute('aria-atomic', 'true');
   el.textContent = message;
   document.body.appendChild(el);
   setTimeout(()=> el.classList.add('fade'), 10);
@@ -126,6 +130,7 @@ function createVehicleRow(value=''){
   input.placeholder = 'ABC1234';
   input.value = value;
   input.className = 'vehicle-input';
+  input.setAttribute('aria-label','Nombor kenderaan');
   input.style.flex = '1';
   input.style.padding = '8px';
   input.style.borderRadius = '8px';
@@ -163,8 +168,8 @@ function getVehicleNumbersFromList(){
 let currentSuggestions = [];
 let focusedIndex = -1;
 
-const LIMIT_SEARCH = 30;      // max total suggestions shown
-const LIMIT_PER_GROUP = 8;    // max items per group shown
+const LIMIT_SEARCH = Infinity;      // no max total suggestions
+const LIMIT_PER_GROUP = Infinity;   // no max items per group
 const GROUP_KEY_REGEX = /^([A-Z0-9]+-\d{1,3})/; // group key extractor
 
 function normQuery(q){
@@ -183,11 +188,8 @@ function matchUnitsGrouped(prefix){
     const m = u.match(GROUP_KEY_REGEX);
     const g = m ? m[1] : u.split('-').slice(0,2).join('-');
     groups[g] = groups[g] || [];
-    if (groups[g].length < LIMIT_PER_GROUP && total < LIMIT_SEARCH) {
-      groups[g].push(u);
-      total++;
-    }
-    if (total >= LIMIT_SEARCH) break;
+    groups[g].push(u);
+    total++;
   }
   return groups;
 }
@@ -217,6 +219,8 @@ function createItemNode(text, index) {
   div.role = 'option';
   div.setAttribute('data-value', text);
   div.setAttribute('data-index', index);
+  // set stable id for aria-activedescendant
+  div.id = `unit-suggestion-${index}`;
   div.tabIndex = -1;
   div.textContent = text;
   return div;
@@ -247,6 +251,8 @@ function openSuggestionsGrouped(prefix, wrapperEl, inputEl) {
   });
 
   container.hidden = false;
+  // indicate to assistive tech we'll open
+  if (inputEl) inputEl.setAttribute('aria-expanded', 'true');
   currentSuggestions = Array.from(container.querySelectorAll('.autocomplete-item[role="option"]')).map(el => el.getAttribute('data-value'));
   container.querySelectorAll('.autocomplete-item').forEach(el => el.setAttribute('aria-selected','false'));
   focusedIndex = -1;
@@ -259,6 +265,12 @@ function closeSuggestions(wrapperEl) {
   container.innerHTML = '';
   currentSuggestions = [];
   focusedIndex = -1;
+  // reset aria on input
+  const inputEl = wrapperEl.querySelector('input');
+  if (inputEl) {
+    inputEl.setAttribute('aria-expanded', 'false');
+    inputEl.removeAttribute('aria-activedescendant');
+  }
 }
 
 function selectSuggestionByIndex(idx, inputEl, wrapperEl) {
@@ -273,6 +285,18 @@ function navSetAriaSelected(listEl, focusedIdx) {
   const options = listEl.querySelectorAll('.autocomplete-item[role="option"]');
   options.forEach((el, idx) => el.setAttribute('aria-selected', idx === focusedIdx ? 'true' : 'false'));
   if (focusedIdx >= 0 && options[focusedIdx]) options[focusedIdx].scrollIntoView({block:'nearest'});
+  // set aria-activedescendant on input if available
+  const wrap = listEl.closest('.autocomplete-wrap');
+  if (wrap) {
+    const input = wrap.querySelector('input');
+    if (input) {
+      if (focusedIdx >= 0 && options[focusedIdx]) {
+        input.setAttribute('aria-activedescendant', options[focusedIdx].id);
+      } else {
+        input.removeAttribute('aria-activedescendant');
+      }
+    }
+  }
 }
 
 /* ---------- normalization & pattern check ---------- */
@@ -490,15 +514,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // theme toggle
-  const savedTheme = (localStorage.getItem('visitorTheme') || 'dark');
-  if (savedTheme === 'light') document.documentElement.classList.remove('dark'); else document.documentElement.classList.add('dark');
-  document.getElementById('themeToggle')?.addEventListener('click', () => {
-    const cur = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
-    const next = cur === 'dark' ? 'light' : 'dark';
-    if (next === 'light') document.documentElement.classList.remove('dark'); else document.documentElement.classList.add('dark');
-    try { localStorage.setItem('visitorTheme', next); } catch(e){}
-  });
+  // ensure light theme only (dark mode removed)
+  document.documentElement.classList.remove('dark');
 
   (async () => {
     try { await waitForFirestore(); } catch (err) {

@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="ms" class="dark">
+<html lang="ms">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Borang Daftar Pelawat — Banjaria Court</title>
 
   <!-- Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
 
   <!-- Optional utilities -->
   <script src="https://v1.tailwindcss.com"></script>
@@ -25,14 +25,15 @@
       margin-top: 6px;
       background: var(--card, #fff);
       border: 1px solid var(--input-border, #e5e7eb);
-      border-radius: 8px;
-      max-height: 260px;
+      border-radius: 12px;
+      max-height: 320px;
       overflow: auto;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+      box-shadow: 0 12px 40px rgba(2,6,23,0.12);
+      padding: 6px 8px;
     }
-    .autocomplete-item { padding: 8px 10px; cursor: pointer; font-family: inherit; }
+    .autocomplete-item { padding: 12px 14px; cursor: pointer; font-family: inherit; font-size:15px; border-radius:8px; }
     .autocomplete-item[aria-selected="true"], .autocomplete-item:hover { background: #3b82f6; color: #fff; }
-    .autocomplete-header { font-weight:700; padding:6px 10px; background:transparent; cursor:default; color:var(--muted,#374151); }
+    .autocomplete-header { font-weight:700; padding:6px 10px; background:transparent; cursor:default; color:var(--muted,#374151); font-size:13px; }
     .autocomplete-empty { padding: 10px; color: var(--muted,#6b7280); }
 
     /* Pilihan rapi: checkbox + label + nota sejajar kemas */
@@ -83,6 +84,7 @@
       .form-row.confirm-row { flex-direction: column; align-items: flex-start; gap: 6px; }
       .form-row.confirm-row .field-note { margin-left: 0; }
     }
+    /* keep desktop layout default for confirm-row: no forced margin-left (we use section grouping) */
   </style>
 </head>
 
@@ -110,20 +112,23 @@
         </div>
 
         <div style="display:flex;gap:8px;align-items:center">
-          <label for="themeToggle" class="small muted">Tema</label>
-          <button id="themeToggle" style="padding:6px 10px;border-radius:6px;border:1px solid var(--input-border);background:var(--card);font-weight:600">Light</button>
+          <!-- Theme toggle removed: default light theme -->
         </div>
       </header>
 
       <form id="visitorForm" autocomplete="off" novalidate>
         <!-- Bahagian 1 -->
-        <h3 style="margin:0 0 8px 0">Bahagian 1 — Butiran Penghuni</h3>
+        <div class="form-section section-1">
+          <div class="form-section-header">
+            <div class="icon" aria-hidden="true">🏠</div>
+            <h3 class="section-title" style="margin:0">Bahagian 1 — Butiran Penghuni</h3>
+          </div>
 
        <div class="inline-two">
   <div class="form-row">
     <label for="hostUnit" class="required">Unit rumah</label>
     <div class="autocomplete-wrap">
-      <input id="hostUnit" name="hostUnit" required placeholder="Contoh: A-12-03" aria-describedby="unitHelp" autocomplete="off" />
+      <input id="hostUnit" name="hostUnit" required aria-required="true" placeholder="Contoh: A-12-03" aria-describedby="unitHelp" aria-controls="unitSuggestions" aria-expanded="false" aria-autocomplete="list" role="combobox" autocomplete="off" />
       <div id="unitSuggestions" class="autocomplete-list" role="listbox" aria-label="Cadangan unit" hidden></div>
     </div>
     <div id="unitHelp" class="field-note">Taip awalan seperti <strong>A-1</strong> untuk lihat A-1-1, A-1-2 dan seterusnya.</div>
@@ -133,23 +138,25 @@
 
           <div class="form-row">
             <label for="hostName" class="required">Nama penghuni</label>
-            <input id="hostName" name="hostName" required placeholder="Nama penghuni" />
+            <input id="hostName" name="hostName" required aria-required="true" placeholder="Nama penghuni" />
           </div>
-        </div>
 
         <div class="form-row span-2">
           <label for="hostPhone">Nombor telefon penghuni</label>
           <input id="hostPhone" name="hostPhone" type="tel" inputmode="tel" placeholder="012-3456789" />
         </div>
-
         <hr style="border:none;border-top:1px solid var(--input-border);margin:12px 0" />
-
+        </div>
         <!-- Bahagian 2 -->
-        <h3 style="margin:0 0 8px 0">Bahagian 2 — Butiran Kemasukkan</h3>
+        <div class="form-section section-2">
+          <div class="form-section-header">
+            <div class="icon" aria-hidden="true">📋</div>
+            <h3 class="section-title" style="margin:0">Bahagian 2 — Butiran Kemasukkan</h3>
+          </div>
 
         <div class="form-row">
           <label for="category" class="required">Kategori</label>
-          <select id="category" name="category" required>
+          <select id="category" name="category" required aria-required="true">
             <option value="">— Pilih —</option>
             <option value="Pelawat">Pelawat</option>
             <option value="Kontraktor">Kontraktor</option>
@@ -183,7 +190,7 @@
 
         <div class="form-row span-2">
           <label for="visitorName" class="required">Nama pelawat</label>
-          <input id="visitorName" name="visitorName" required placeholder="Contoh: Ahmad bin Ali" />
+          <input id="visitorName" name="visitorName" required aria-required="true" placeholder="Contoh: Ahmad bin Ali" />
         </div>
 
         <div class="form-row">
@@ -201,7 +208,7 @@
 
         <div class="form-row">
           <label for="eta" class="required">Tarikh ETA</label>
-          <input id="eta" name="eta" type="date" required />
+          <input id="eta" name="eta" type="date" required aria-required="true" />
         </div>
 
         <div class="form-row">
@@ -212,8 +219,13 @@
 
         <hr style="border:none;border-top:1px solid var(--input-border);margin:12px 0" />
 
+        </div>
         <!-- Bahagian 3 -->
-        <h3 style="margin:0 0 8px 0">Bahagian 3 — Butiran Kenderaan</h3>
+        <div class="form-section section-3">
+          <div class="form-section-header">
+            <div class="icon" aria-hidden="true">🚗</div>
+            <h3 class="section-title" style="margin:0">Bahagian 3 — Butiran Kenderaan</h3>
+          </div>
 
         <div id="vehicleSingleWrap" class="form-row">
           <label for="vehicleNo">Nombor kenderaan</label>
@@ -241,10 +253,15 @@
           </select>
         </div>
 
+        </div>
         <!-- Pengesahan -->
-        <div class="form-row span-2" style="margin-top:12px">
+        <div class="form-section section-4" style="margin-top:12px">
+          <div class="form-section-header">
+            <div class="icon" aria-hidden="true">✅</div>
+            <h3 class="section-title" style="margin:0">Pengesahan</h3>
+          </div>
           <fieldset style="border:0;padding:0;margin:0">
-            <legend class="required" style="font-weight:600;margin-bottom:6px">Pengesahan</legend>
+            <legend class="required sr-only">Pengesahan</legend>
             <div style="font-size:13px;color:var(--muted);line-height:1.4;margin-bottom:8px">
               Dengan ini saya mengesahkan bahawa :-
               <ol style="margin:6px 0 0 18px;padding:0">
@@ -256,7 +273,7 @@
 
             <div class="form-row confirm-row">
               <div class="confirm-left">
-                <input id="confirmAgree" type="checkbox" name="confirmAgree" />
+                <input id="confirmAgree" type="checkbox" name="confirmAgree" aria-required="true" />
                 <label for="confirmAgree">Saya setuju</label>
               </div>
               <div class="field-note">Tandakan untuk meneruskan pendaftaran.</div>
@@ -270,7 +287,7 @@
           <div class="actions">
             <button type="submit" id="submitBtn" class="btn">Hantar</button>
             <button type="button" id="clearBtn" class="btn-ghost">Kosongkan</button>
-            <div id="statusMsg" class="small" style="align-self:center;margin-left:8px"></div>
+            <div id="statusMsg" role="status" aria-live="polite" class="small" style="align-self:center;margin-left:8px"></div>
           </div>
         </div>
       </form>

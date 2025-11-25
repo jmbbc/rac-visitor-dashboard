@@ -12,6 +12,13 @@
   --gray:#6b7280;
   --input-border:#e5e7eb;
   --btn-bg:var(--accent);
+  --form-section-bg: #f8fafc; /* subtle off-white */
+  --form-section-border: rgba(2,6,23,0.06);
+  --form-section-left: rgba(2,6,23,0.12);
+  --section-1-left: #0ea5e9; /* sky-500 */
+  --section-2-left: #8b5cf6; /* violet-500 */
+  --section-3-left: #16a34a; /* green-500 */
+  --section-4-left: #111827; /* strong neutral for confirm section */
 
   /* form text tokens (defaults) */
   --form-text: #111827;
@@ -31,12 +38,13 @@
   --radius-sm:6px;
   --radius:8px;
   --radius-pill:999px;
+  --label-col-width: 200px; /* used to align form fields in the grid */
 
   --elev-1: 0 1px 3px rgba(2,6,23,0.06);
   --elev-2: 0 6px 18px rgba(2,6,23,0.08);
 
   --font-ui: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-  --font-label: "Source Sans 3", var(--font-ui);
+  --font-label: var(--font-ui);
 }
 html.dark{
   --bg:#0b1220;
@@ -67,6 +75,8 @@ body{
   -webkit-font-smoothing:antialiased;
   -moz-osx-font-smoothing:grayscale;
 }
+/* Utility for screen-reader only text */
+.sr-only { position:absolute !important; width:1px !important; height:1px !important; padding:0 !important; margin:-1px !important; overflow:hidden !important; clip:rect(0,0,0,0) !important; white-space:nowrap !important; border:0 !important; }
 .container{padding:18px 16px;max-width:1100px;margin:0 auto}
 .card{
   background:var(--surface);
@@ -76,12 +86,22 @@ body{
   box-sizing:border-box;
 }
 
+/* Section card visual for forms (subtle grouping) */
+.card .section-title{
+  font-size:16px;
+  font-weight:700;
+  margin:0 0 10px 0;
+  color:var(--text-900);
+}
+
 /* -------------------------
    Typography & small utilities
    ------------------------- */
 h1,h2,h3{font-weight:700;color:var(--text-900)}
-h1{margin-top:0}
-label{font-family:var(--font-label);font-weight:600;font-size:14px;color:var(--text-900)}
+h1{margin-top:0; font-size:20px}
+h2{font-size:16px}
+h3{font-size:14px}
+label{font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--text-900)}
 .small{font-size:13px;color:var(--muted)}
 .muted{color:var(--muted)}
 .muted-small{font-size:13px;color:var(--text-muted)}
@@ -185,6 +205,11 @@ form .form-row label{
   font-family: var(--label-font) !important;
   font-weight:700;
   font-size:14px;
+  .form-section.section-1 .form-section-header .icon,
+  .form-section.section-2 .form-section-header .icon,
+  .form-section.section-3 .form-section-header .icon {
+    width: 30px; height: 30px; font-size:16px;
+  }
   color:var(--gray);
   justify-self: end;
   padding-right: 6px;
@@ -336,10 +361,59 @@ form textarea[placeholder] {
   #statusMsg { text-align: center !important; margin-top: 4px !important; }
 }
 
-/* Typography: Inter body + Source Sans 3 labels + monospace for technical fields */
+/* Mobile / touch friendly adjustments */
+@media (max-width: 720px) {
+  .card { padding: 20px; border-radius: 12px; }
+  h1, h2, h3 { letter-spacing: -0.01em; }
+  .form-row { gap: 10px !important; }
+  input, select, textarea { padding: 12px 14px; border-radius: 10px; }
+  label { font-size: 14px; }
+  .field-note { font-size: 13px; }
+}
+
+/* Section separators for better visual grouping */
+.form-section { padding: 14px; border-radius: 12px; background: var(--form-section-bg); margin-bottom: 18px; box-shadow: var(--elev-1); border: 1px solid var(--form-section-border); }
+.form-section { border-left: 6px solid var(--form-section-left); padding-left: 12px; }
+
+.form-section.section-1 { border-left-color: var(--section-1-left); }
+.form-section.section-2 { border-left-color: var(--section-2-left); }
+.form-section.section-3 { border-left-color: var(--section-3-left); }
+.form-section.section-4 { border-left-color: var(--section-4-left); }
+.form-section + .form-section { margin-top: 8px; }
+.form-section-header { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.form-section-header .icon { width:36px; height:36px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; background:transparent; color:var(--accent); font-size:18px; }
+.form-section.section-1 .form-section-header .icon { background: linear-gradient(180deg, rgba(14,165,233,0.12), rgba(14,165,233,0.06)); color: var(--section-1-left); }
+.form-section.section-2 .form-section-header .icon { background: linear-gradient(180deg, rgba(139,92,246,0.12), rgba(139,92,246,0.06)); color: var(--section-2-left); }
+.form-section.section-3 .form-section-header .icon { background: linear-gradient(180deg, rgba(22,163,74,0.12), rgba(22,163,74,0.06)); color: var(--section-3-left); }
+.form-section.section-4 .form-section-header .icon { background: linear-gradient(180deg, rgba(17,24,39,0.12), rgba(17,24,39,0.06)); color: var(--section-4-left); }
+
+/* Autofill the autocomplete suggestion items to be easier to tap */
+.autocomplete-item { padding: 12px 14px; font-size: 15px; }
+.autocomplete-header { padding: 8px 10px; font-weight:700; color:var(--muted); }
+
+/* Toast styles: floating and non-blocking */
+.toast, .msg { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); z-index: 24000; padding: 12px 18px; border-radius: 12px; box-shadow: 0 8px 30px rgba(6,6,15,0.12); display:inline-flex; align-items:center; gap:8px; font-weight:700; }
+.toast.ok, .msg.ok{ background:var(--ok); color:#042e17; }
+.toast.err, .msg.err{ background:var(--danger); color:#fff; }
+.toast { transition: transform .22s ease, opacity .22s ease; }
+.toast.fade, .msg.fade { opacity: 0; transform: translateX(-50%) translateY(16px); }
+
+/* Vehicle row improvements */
+#vehicleList .vehicle-row { padding: 6px; border-radius: 8px; box-shadow: var(--elev-1); gap: 10px; margin-bottom: 8px; }
+.vehicle-remove { background: transparent; border: 1px solid rgba(0,0,0,0.06); color: var(--danger); min-width: 36px; padding: 8px; font-size:18px; border-radius:8px; }
+.vehicle-remove:hover { background: rgba(239,68,68,0.06); }
+
+/* Make primary actions more obvious on mobile */
+@media (max-width: 720px) {
+  .card { padding: 20px; border-radius: 12px; }
+  .btn-ghost { border-radius: 12px; padding: 12px; }
+  .form-row { gap: 10px !important; }
+
+/* Typography: Inter for body and labels + monospace for technical fields */
 :root{
+  .form-section { padding: 14px 12px; border-radius: 10px; }
   --ui-font: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --label-font: "Source Sans 3", "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --label-font: var(--font-ui);
   --mono-font: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", "Courier New", monospace;
 }
 html, body {
@@ -348,7 +422,7 @@ html, body {
   -moz-osx-font-smoothing: grayscale;
 }
 form .form-row label {
-  font-family: var(--label-font) !important;
+  font-family: var(--font-ui) !important;
   font-weight: 600 !important;
   letter-spacing: -0.01em;
   color: var(--gray) !important;
