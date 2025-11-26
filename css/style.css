@@ -658,3 +658,16 @@ button:focus, input:focus, select:focus, textarea:focus{
 
 /* Prevent accidental input scaling on iOS */
 input, textarea, select { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
+
+   @media (max-width: 640px) {
+  /* Gantikan #visitorForm dengan id/kelas sebenar borang anda jika berbeza */
+  #visitorForm .form-section {
+    box-shadow: none !important;
+    border-left: none !important;
+    border: 0.5px solid #000 !important;
+    background: var(--form-section-bg);
+    padding: 12px !important;
+    border-radius: 10px !important;
+  }
+}
+
