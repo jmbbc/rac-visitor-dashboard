@@ -671,3 +671,21 @@ input, textarea, select { -webkit-text-size-adjust:100%; -ms-text-size-adjust:10
   }
 }
 
+   .parking-group {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:8px;
+  padding:10px 12px;
+  border-radius:8px;
+  border:0.5px solid rgba(0,0,0,0.06);
+}
+.parking-group.pindah {
+  background: #fff7f0;
+  border-color: rgba(255,122,89,0.12);
+  box-shadow: 0 2px 6px rgba(255,122,89,0.04);
+}
+.cat-badge { display:inline-block; padding:4px 8px; border-radius:6px; font-weight:700; color:#fff; }
+.cat-pindah { background:#ff7a59; }
+.small { font-size:13px; color:var(--muted,#6b7280); margin-left:8px; }
+
