@@ -689,3 +689,18 @@ input, textarea, select { -webkit-text-size-adjust:100%; -ms-text-size-adjust:10
 .cat-pindah { background:#ff7a59; }
 .small { font-size:13px; color:var(--muted,#6b7280); margin-left:8px; }
 
+/* small-box utility for fixed visual strip */
+.small-box {
+  width: 100%;
+  max-width: 710.4px;
+  height: 19.2px;
+  background: #fff7f0;
+  padding: 0 8px;
+  display:flex;
+  align-items:center;
+  border-radius:4px;
+  border:0.5px solid rgba(0,0,0,0.06);
+  box-sizing:border-box;
+  color:var(--text-900);
+  font-size:13px;
+}
