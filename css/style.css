@@ -386,6 +386,17 @@ form textarea[placeholder] {
 .form-section.section-2 .form-section-header .icon { background: linear-gradient(180deg, rgba(139,92,246,0.12), rgba(139,92,246,0.06)); color: var(--section-2-left); }
 .form-section.section-3 .form-section-header .icon { background: linear-gradient(180deg, rgba(22,163,74,0.12), rgba(22,163,74,0.06)); color: var(--section-3-left); }
 .form-section.section-4 .form-section-header .icon { background: linear-gradient(180deg, rgba(17,24,39,0.12), rgba(17,24,39,0.06)); color: var(--section-4-left); }
+/* Color the header area per section so each group has a subtle background tint */
+.form-section-header { padding: 8px 10px; border-radius: 8px; }
+.form-section.section-1 .form-section-header { background: linear-gradient(90deg, rgba(14,165,233,0.06), rgba(14,165,233,0.03)); }
+.form-section.section-2 .form-section-header { background: linear-gradient(90deg, rgba(139,92,246,0.06), rgba(139,92,246,0.03)); }
+.form-section.section-3 .form-section-header { background: linear-gradient(90deg, rgba(22,163,74,0.06), rgba(22,163,74,0.03)); }
+.form-section.section-4 .form-section-header { background: linear-gradient(90deg, rgba(17,24,39,0.06), rgba(17,24,39,0.03)); }
+
+.form-section.section-1 .section-title { color: var(--section-1-left); }
+.form-section.section-2 .section-title { color: var(--section-2-left); }
+.form-section.section-3 .section-title { color: var(--section-3-left); }
+.form-section.section-4 .section-title { color: var(--section-4-left); }
 
 /* Autofill the autocomplete suggestion items to be easier to tap */
 .autocomplete-item { padding: 12px 14px; font-size: 15px; }
