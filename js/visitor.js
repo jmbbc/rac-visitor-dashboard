@@ -189,7 +189,6 @@ async function createResponseWithDedupe(payload){
       throw e;
     }
   }
-  }
 }
 
 /* ---------- vehicle helpers ---------- */
