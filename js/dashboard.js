@@ -1185,11 +1185,12 @@ document.addEventListener('DOMContentLoaded', ()=>{ /* ready */ });
       table.style.width = '100%';
       // No table column headers (we display combined cards per date)
       const tbody = document.createElement('tbody');
-      // Build rows per day
+      // Build rows per day (2-column: Date | Vehicle + Unit)
       dayKeys.forEach(k => {
         const theDate = new Date(k);
         const tr = document.createElement('tr');
-        const tdCombined = document.createElement('td'); tdCombined.colSpan = 2; tdCombined.className = 'pw-combined-cell';
+        const tdDate = document.createElement('td'); tdDate.className = 'pw-date-cell';
+        const tdItems = document.createElement('td'); tdItems.className = 'pw-items-cell';
         // find rows where ETA..ETD includes this date
         const items = pelawat.filter(r => {
           try{
@@ -1202,9 +1203,7 @@ document.addEventListener('DOMContentLoaded', ()=>{ /* ready */ });
           } catch(e){ return false; }
         });
 
-        // wrap each date's items into a grouped "card" for clear visual separation (combined date + vehicle list)
-        const dayCard = document.createElement('div'); dayCard.className = 'pw-day-card pw-day-combined';
-        // header with date information
+        // header with date information (left column)
         const headerEl = document.createElement('div'); headerEl.className = 'pw-day-header';
         const dayLong = theDate.toLocaleDateString(undefined, { weekday: 'long' });
         const malayDays = ['Ahad','Isnin','Selasa','Rabu','Khamis','Jumaat','Sabtu'];
@@ -1213,7 +1212,7 @@ document.addEventListener('DOMContentLoaded', ()=>{ /* ready */ });
         const mm = String(theDate.getMonth()+1).padStart(2,'0');
         const yy = theDate.getFullYear();
         headerEl.innerHTML = `<div style="font-weight:700">${dayLong} (${malay})</div><div class="small">${dd}/${mm}/${yy}</div>`;
-        dayCard.appendChild(headerEl);
+        tdDate.appendChild(headerEl);
 
         // total vehicle count for this day (account for arrays / strings)
         const totalVehicles = items.reduce((acc, rr) => {
@@ -1225,31 +1224,48 @@ document.addEventListener('DOMContentLoaded', ()=>{ /* ready */ });
         }, 0);
 
         if (!items.length) {
-          const empty = document.createElement('div'); empty.className = 'small muted'; empty.textContent = 'Tiada pelawat Checked In'; dayCard.appendChild(empty);
+          const empty = document.createElement('div'); empty.className = 'small muted'; empty.textContent = 'Tiada pelawat Checked In'; tdItems.appendChild(empty);
         } else {
           const list = document.createElement('div'); list.className = 'pw-vehicle-list';
           // if more than 2 vehicle items, use a 2-column grid
           if (totalVehicles > 2) list.classList.add('multi-cols');
           // show all vehicle numbers (no limit); support vehicleNo and vehicleNumbers (array or string)
+          // Collect vehicle+unit entries and dedupe exact pairs per day
+          const pairs = [];
           items.forEach(r => {
-            const nums = [];
-            if (r.vehicleNo) nums.push(String(r.vehicleNo));
-            if (Array.isArray(r.vehicleNumbers)) nums.push(...r.vehicleNumbers.map(x=>String(x)));
-            if (typeof r.vehicleNumbers === 'string' && !r.vehicleNo) nums.push(r.vehicleNumbers);
-            nums.forEach(num => {
-              const item = document.createElement('div'); item.className = 'pw-vehicle-item';
-              item.textContent = String(num || '-');
-              // keep clickable behavior to open response edit
-              item.addEventListener('click', ()=>{ try{ const id = r.id; if (id) openEditModalFor && typeof openEditModalFor === 'function' ? openEditModalFor(id) : toast('Buka butiran pendaftaran (fungsi tidak tersedia)', false); } catch(e) { console.warn(e); } });
-              list.appendChild(item);
+            const rawNums = [];
+            if (r.vehicleNo) rawNums.push(String(r.vehicleNo));
+            if (Array.isArray(r.vehicleNumbers)) rawNums.push(...r.vehicleNumbers.map(x => String(x)));
+            if (typeof r.vehicleNumbers === 'string' && !r.vehicleNo) rawNums.push(String(r.vehicleNumbers));
+            rawNums.forEach(num => {
+              const plate = String(num || '').trim();
+              if (!plate) return;
+              const unit = r.hostUnit ? String(r.hostUnit).trim() : '';
+              pairs.push({ plate, unit, id: r.id });
             });
           });
-          dayCard.appendChild(list);
+
+          // dedupe by plate + unit (so same plate at different units is kept, exact duplicates removed)
+          const unique = [];
+          const seen = new Set();
+          pairs.forEach(p => {
+            const key = `${p.plate}||${p.unit}`;
+            if (!seen.has(key)) { seen.add(key); unique.push(p); }
+          });
+
+          unique.forEach(r => {
+            const item = document.createElement('div'); item.className = 'pw-vehicle-item';
+            const unit = r.unit ? ` — ${r.unit}` : '';
+            item.textContent = `${r.plate}${unit}`;
+            // attempt to open matching response id if available
+            item.addEventListener('click', ()=>{ try{ const id = r.id; if (id) openEditModalFor && typeof openEditModalFor === 'function' ? openEditModalFor(id) : toast('Buka butiran pendaftaran (fungsi tidak tersedia)', false); } catch(e) { console.warn(e); } });
+            list.appendChild(item);
+          });
+          tdItems.appendChild(list);
         }
-        // place the grouped card into the combined cell
-        tdCombined.appendChild(dayCard);
-        
-        tr.appendChild(tdCombined);
+        // append two columns
+        tr.appendChild(tdDate);
+        tr.appendChild(tdItems);
         tbody.appendChild(tr);
       });
 

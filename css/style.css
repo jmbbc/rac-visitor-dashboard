@@ -99,6 +99,15 @@ body{
   margin:0 0 10px 0;
   color:var(--text-900);
 }
+/* Parking week view styles */
+.parking-week-table { border-collapse: collapse; margin-top: 8px; }
+.parking-week-table td { vertical-align: top; padding: 12px; border-top: 1px solid var(--input-border); }
+.pw-date-cell { width: 220px; min-width:160px; max-width:260px; }
+.pw-date-cell .pw-day-header { font-weight:700; }
+.pw-items-cell .pw-vehicle-list { display:flex; flex-direction:column; gap:6px; }
+.pw-vehicle-item { padding:6px 8px; border-radius:8px; background:var(--surface); border:1px solid rgba(0,0,0,0.04); display:inline-block; cursor:pointer; }
+.pw-vehicle-list.multi-cols { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.pw-vehicle-item:hover { background: rgba(37,99,235,0.04); }
 
 /* -------------------------
    Typography & small utilities
