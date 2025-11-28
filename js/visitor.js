@@ -2,6 +2,7 @@
 import {
   collection, serverTimestamp, Timestamp, doc, runTransaction
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-functions.js";
 
 /* ---------- full units array (from your List.csv) ---------- */
 const units = [
@@ -127,10 +128,13 @@ function dateFromInputDateOnly(val){
 function _shortId(){ return Math.random().toString(36).slice(2,9); }
 
 async function createResponseWithDedupe(payload){
-  if (!window.__FIRESTORE) throw new Error('Firestore not available');
+  // Use Cloud Function (callable) to perform server-side transaction (avoids client permission issues)
+  if (!window.__FIREBASE_APP) throw new Error('Firebase app not available');
 
-  // build dateKey in yyyy-mm-dd for dedupe grouping
-  let etaDate = payload.eta && payload.eta.toDate ? payload.eta.toDate() : (payload.eta instanceof Date ? payload.eta : new Date(payload.eta));
+  // Normalize ETA/ETD to ISO strings (callable serializes JSON cleanly)
+  const safePayload = Object.assign({}, payload);
+  try { if (safePayload.eta && safePayload.eta.toDate) safePayload.eta = safePayload.eta.toDate().toISOString(); } catch(e) {}
+  try { if (safePayload.etd && safePayload.etd.toDate) safePayload.etd = safePayload.etd.toDate().toISOString(); } catch(e) {}
   if (!etaDate || isNaN(etaDate.getTime())) throw new Error('Invalid eta date');
   const yy = etaDate.getFullYear();
   const mm = String(etaDate.getMonth()+1).padStart(2,'0');
@@ -142,35 +146,16 @@ async function createResponseWithDedupe(payload){
   const nameKey = payload.visitorName ? String(payload.visitorName).trim().toLowerCase().replace(/\s+/g,'_').slice(0,64) : '';
   const dedupeKey = `dedupe-${dateKey}_${(payload.hostUnit||'').replace(/\s+/g,'')}_${phoneNorm || nameKey || _shortId()}`;
 
-  // deterministic response id so we can write it inside the transaction atomically
-  const responseId = `resp-${Date.now()}-${_shortId()}`;
-
-  // transaction writes both dedupe doc and response doc atomically
-  const dedupeRef = doc(window.__FIRESTORE, 'dedupeKeys', dedupeKey);
-  const respRef = doc(window.__FIRESTORE, 'responses', responseId);
-
+  const funcs = getFunctions(window.__FIREBASE_APP);
+  const fn = httpsCallable(funcs, 'createResponseWithDedupe');
   try {
-    await runTransaction(window.__FIRESTORE, async (tx) => {
-      const dSnap = await tx.get(dedupeRef);
-      if (dSnap.exists()) throw new Error('duplicate');
-
-      // set dedupe marker
-      tx.set(dedupeRef, {
-        responseId,
-        hostUnit: payload.hostUnit || '',
-        visitorPhone: payload.visitorPhone || '',
-        visitorName: payload.visitorName || '',
-        etaDate: dateKey,
-        createdAt: serverTimestamp()
-      });
-
-      // set response doc
-      tx.set(respRef, payload);
-    });
-
-    return responseId;
+    const res = await fn({ payload: safePayload });
+    if (res && res.data && res.data.success) return res.data.id;
+    throw new Error('function_failed');
   } catch (err) {
-    if (String(err).toLowerCase().includes('duplicate')) {
+    // firebase functions throws HttpsError with code property
+    const code = err && err.code ? err.code : (err && err.message ? err.message : 'server_error');
+    if (String(code).toLowerCase().includes('already-exists') || String(err).toLowerCase().includes('duplicate')) {
       const e = new Error('duplicate'); e.code = 'DUPLICATE'; throw e;
     }
     throw err;
