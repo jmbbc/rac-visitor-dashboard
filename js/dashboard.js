@@ -1145,10 +1145,40 @@ document.addEventListener('DOMContentLoaded', ()=>{ /* ready */ });
       // Only Pelawat category
       const pelawat = rows.filter(r => determineCategory(r) === 'Pelawat');
 
+      // Build per-plate counts across the week (count of distinct days a plate appears on)
+      // We'll use this to mark plates that appear on multiple days
+      const plateDays = {}; // plate -> Set of dayKeys
+      pelawat.forEach(r => {
+        // gather all plates for this registration
+        const plates = new Set();
+        if (r.vehicleNo) plates.add(String(r.vehicleNo).trim());
+        if (Array.isArray(r.vehicleNumbers)) r.vehicleNumbers.forEach(x => plates.add(String(x).trim()));
+        if (typeof r.vehicleNumbers === 'string' && !r.vehicleNo) plates.add(String(r.vehicleNumbers).trim());
+        // if none, skip
+        plates.forEach(pl => {
+          if (!pl) return;
+          const key = dayKey(r.eta && r.eta.toDate ? r.eta.toDate() : (r.eta ? new Date(r.eta) : new Date()));
+          plateDays[pl] = plateDays[pl] || new Set();
+          plateDays[pl].add(key);
+        });
+      });
+
+      // convert to counts map for quick lookup
+      const plateCounts = {};
+      Object.keys(plateDays).forEach(p => { plateCounts[p] = plateDays[p].size; });
+
       // build calendar container
       let calWrap = document.getElementById('parkingWeekCalendar');
       if (!calWrap){ calWrap = document.createElement('div'); calWrap.id = 'parkingWeekCalendar'; calWrap.className = 'card'; calWrap.style.marginTop = '12px'; }
       calWrap.innerHTML = '';
+
+      // helper: stable color mapping per plate (simple hash -> palette)
+      const dupPalette = ['#FB7185','#60A5FA','#F59E0B','#34D399','#A78BFA','#F97316','#60A5FA','#FCA5A5','#86EFAC'];
+      function colorForPlate(plate) {
+        if (!plate) return dupPalette[0];
+        let h = 0; for (let i=0;i<plate.length;i++) h = ((h<<5)-h) + plate.charCodeAt(i), h |= 0;
+        const idx = Math.abs(h) % dupPalette.length; return dupPalette[idx];
+      }
 
       const header = document.createElement('div');
       header.style.display = 'flex'; header.style.justifyContent='space-between'; header.style.alignItems='center'; header.style.gap='8px';
@@ -1256,7 +1286,21 @@ document.addEventListener('DOMContentLoaded', ()=>{ /* ready */ });
           unique.forEach(r => {
             const item = document.createElement('div'); item.className = 'pw-vehicle-item';
             const unit = r.unit ? ` — ${r.unit}` : '';
+            // if plate appears on more than one day this week, mark it
+            const count = plateCounts[r.plate] || 0;
             item.textContent = `${r.plate}${unit}`;
+            if (count > 1) {
+              item.classList.add('pw-vehicle-duplicate');
+              item.setAttribute('data-dup-count', String(count));
+              // store plate on element for later color mapping
+              item.setAttribute('data-plate', r.plate);
+              // assign consistent color for this plate
+              const pcolor = colorForPlate(r.plate);
+              try { item.style.setProperty('--dup-color', pcolor); } catch(e) {}
+              // add small icon for duplication visibility
+              const icon = document.createElement('span'); icon.className = 'dup-icon'; icon.textContent = '🔁'; icon.setAttribute('aria-hidden','true');
+              item.insertBefore(icon, item.firstChild);
+            }
             // attempt to open matching response id if available
             item.addEventListener('click', ()=>{ try{ const id = r.id; if (id) openEditModalFor && typeof openEditModalFor === 'function' ? openEditModalFor(id) : toast('Buka butiran pendaftaran (fungsi tidak tersedia)', false); } catch(e) { console.warn(e); } });
             list.appendChild(item);

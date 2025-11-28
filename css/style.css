@@ -106,6 +106,14 @@ body{
 .pw-date-cell .pw-day-header { font-weight:700; }
 .pw-items-cell .pw-vehicle-list { display:flex; flex-direction:column; gap:6px; }
 .pw-vehicle-item { padding:6px 8px; border-radius:8px; background:var(--surface); border:1px solid rgba(0,0,0,0.04); display:inline-block; cursor:pointer; }
+.pw-vehicle-item .dup-icon { margin-right:6px; opacity:0.92; }
+.pw-vehicle-duplicate { position:relative; padding-left:8px; }
+.pw-vehicle-duplicate::before { content: ""; display:inline-block; width:8px; height:8px; border-radius:99px; margin-right:8px; vertical-align:middle; background: var(--dup-color, #2563eb);} 
+.pw-vehicle-duplicate[data-dup-count]:after { content: attr(data-dup-count); display:inline-block; font-size:11px; margin-left:8px; color:var(--muted); background:transparent; border-radius:8px; padding:0 4px; vertical-align:middle; }
+
+/* color mapping will be applied inline at render-time via style.background or border-color; fallback */
+.pw-vehicle-duplicate { border-left: 4px solid var(--dup-color, rgba(0,0,0,0.06)); }
+.pw-vehicle-duplicate .dup-icon { display:inline-block; width:14px; text-align:center; }
 .pw-vehicle-list.multi-cols { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
 .pw-vehicle-item:hover { background: rgba(37,99,235,0.04); }
 
