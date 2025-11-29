@@ -4,6 +4,7 @@
 import {
   collection, query, where, getDocs, orderBy, doc, updateDoc, serverTimestamp,
   addDoc, setDoc, Timestamp, getDoc, runTransaction, writeBatch
+  , getCountFromServer
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 import {
   signInWithEmailAndPassword, signOut, onAuthStateChanged
@@ -95,6 +96,9 @@ loginBtn.addEventListener('click', async ()=>{
   const pass = document.getElementById('loginPass').value;
   showLoginMsg(loginMsg, 'Log masuk...');
   try {
+    // prepare aggregation flag/values
+    let aggCountsOK = false;
+    let aggTotal = 0, aggCheckedIn = 0, aggCheckedOut = 0;
     const cred = await signInWithEmailAndPassword(window.__AUTH, email, pass);
     console.info('Login success:', cred.user && (cred.user.email || cred.user.uid));
     showLoginMsg(loginMsg, 'Berjaya log masuk.');
@@ -196,6 +200,28 @@ async function loadListForDateStr(yyyymmdd){
     if (responseCache.date === yyyymmdd && Array.isArray(responseCache.rows) && responseCache.rows.length) {
       rows = responseCache.rows;
     } else {
+      // try to compute KPIs using aggregation counts (cheaper than reading all docs when possible)
+      let total = 0, checkedIn = 0, checkedOut = 0;
+      try {
+        const colRefCounts = collection(window.__FIRESTORE, 'responses');
+        const qTotal = query(colRefCounts, where('eta', '>=', Timestamp.fromDate(from)), where('eta', '<', Timestamp.fromDate(to)));
+        const totalSnap = await getCountFromServer(qTotal);
+        total = totalSnap.data().count || 0;
+
+        const qIn = query(colRefCounts, where('eta', '>=', Timestamp.fromDate(from)), where('eta', '<', Timestamp.fromDate(to)), where('status','==','Checked In'));
+        const inSnap = await getCountFromServer(qIn);
+        checkedIn = inSnap.data().count || 0;
+
+        const qOut = query(colRefCounts, where('eta', '>=', Timestamp.fromDate(from)), where('eta', '<', Timestamp.fromDate(to)), where('status','==','Checked Out'));
+        const outSnap = await getCountFromServer(qOut);
+        checkedOut = outSnap.data().count || 0;
+
+        aggCountsOK = true;
+        aggTotal = total; aggCheckedIn = checkedIn; aggCheckedOut = checkedOut;
+      } catch (countErr) {
+        // If counts fail (older SDK or network) we'll fall back to counting from rows
+        console.warn('Aggregation counts failed, falling back to in-memory counts later', countErr);
+      }
       const col = collection(window.__FIRESTORE, 'responses');
       const q = query(col, where('eta', '>=', Timestamp.fromDate(from)), where('eta', '<', Timestamp.fromDate(to)), orderBy('eta','asc'));
       const snap = await getDocs(q);
@@ -203,20 +229,28 @@ async function loadListForDateStr(yyyymmdd){
       // cache for reuse
       responseCache.date = yyyymmdd;
       responseCache.rows = rows;
+
+      // If aggregation succeeded earlier update KPIs using those numbers; otherwise compute from rows
+      if (aggCountsOK) {
+        const pending = Math.max(0, aggTotal - aggCheckedIn - aggCheckedOut);
+        renderKPIs(pending, aggCheckedIn, aggCheckedOut);
+      }
     }
 
     // store in cache for reuse by other functions (export, parking summary)
     responseCache.date = yyyymmdd;
     responseCache.rows = rows;
 
-    // KPIs
-    let pending = 0, checkedIn = 0, checkedOut = 0;
-    rows.forEach(r => {
-      if (!r.status || r.status === 'Pending') pending++;
-      else if (r.status === 'Checked In') checkedIn++;
-      else if (r.status === 'Checked Out') checkedOut++;
-    });
-    renderKPIs(pending, checkedIn, checkedOut);
+    // KPIs (if aggregation counts failed earlier we'll compute from rows)
+    if (!aggCountsOK) {
+      let pending = 0, checkedIn = 0, checkedOut = 0;
+      rows.forEach(r => {
+        if (!r.status || r.status === 'Pending') pending++;
+        else if (r.status === 'Checked In') checkedIn++;
+        else if (r.status === 'Checked Out') checkedOut++;
+      });
+      renderKPIs(pending, checkedIn, checkedOut);
+    }
 
     // render pages
     renderList(rows, listAreaSummary, false);
