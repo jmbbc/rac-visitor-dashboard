@@ -49,6 +49,9 @@
   /* explicit label color for consistent contrast */
   --label-color: #000000;
 }
+
+/* Skip-link: visible when focused for keyboard users */
+.skip-link:focus { position: static !important; clip: auto !important; width: auto !important; height: auto !important; left: auto !important; top: auto !important; overflow: visible !important; padding: 8px 12px; background: #111827; color: #fff; border-radius: 6px; z-index: 9999; text-decoration: none; }
 /* Defensive: ensure .hidden works even if Tailwind isn't loaded */
 .hidden { display: none !important; }
 html.dark{
@@ -116,6 +119,35 @@ body{
 .pw-vehicle-duplicate .dup-icon { display:inline-block; width:14px; text-align:center; }
 .pw-vehicle-list.multi-cols { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; }
 .pw-vehicle-item:hover { background: rgba(37,99,235,0.04); }
+
+/* Make parking vehicle item text denser specifically in the Parking page (web page mode) */
+#pageParking .pw-vehicle-item { font-size: 12px; }
+
+/* Stack date column above items column for the weekly parking view when used as a dedicated page
+   We render each table row as a block so the date appears above and the item column flows below.
+   This keeps the layout tidy regardless of how many columns or grid styles are used for items. */
+#pageParking .parking-week-table tr {
+  display: block;
+  margin-bottom: 12px;
+  border-bottom: none;
+}
+#pageParking .parking-week-table td {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  border-top: none;
+}
+#pageParking .pw-date-cell {
+  /* visually separate the date block so it stands out */
+  background: var(--card);
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 6px;
+}
+#pageParking .pw-items-cell {
+  padding: 0 12px 12px 12px;
+}
 
 /* -------------------------
    Typography & small utilities
