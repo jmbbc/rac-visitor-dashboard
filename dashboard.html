@@ -99,7 +99,14 @@
           </div>
 
           <!-- injected controls (overlap) -->
-          <div id="injectedControls"></div>
+          <div id="injectedControls">
+            <!-- Global search for Senarai Pendaftaran -->
+            <div id="globalSearchWrap" style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+              <label for="globalSearch" class="small muted" style="margin-right:6px;">Cari</label>
+              <input id="globalSearch" placeholder="Cari nama / unit / plat / telefon..." style="flex:1;min-width:160px;padding:8px;border-radius:8px;border:1px solid var(--input-border);" />
+              <button id="clearSearchBtn" type="button" class="btn-ghost" title="Kosongkan carian">✕</button>
+            </div>
+          </div>
 
           <!-- Pages -->
           <div id="pageSummary">
@@ -107,7 +114,14 @@
           </div>
 
           <div id="pageCheckedIn" style="display:none">
-            <h3 style="margin-top:6px">Pelawat Checked In — Hari Ini</h3>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:6px;flex-wrap:wrap">
+              <h3 style="margin:0">Pelawat Checked In — Hari Ini</h3>
+              <div id="checkedInSearchWrap" style="display:flex;gap:8px;align-items:center">
+                <label for="checkedInSearch" class="small muted" style="margin-right:6px;">Cari Checked-In</label>
+                <input id="checkedInSearch" placeholder="Cari nama / unit / plat / telefon..." style="min-width:220px;padding:8px;border-radius:8px;border:1px solid var(--input-border);" />
+                <button id="clearCheckedInSearchBtn" type="button" class="btn-ghost" title="Kosongkan carian">✕</button>
+              </div>
+            </div>
             <div id="listAreaCheckedIn" style="margin-top:8px"></div>
           </div>
 
@@ -126,9 +140,17 @@
                   <div class="ph-value">12:00 am</div>
                 </div>
                 <div class="ph-item ph-grow">
-                  <label for="parkingPKName" class="small muted">Nama PK</label>
+                    <label for="parkingPKName" class="small muted">Nama PK</label>
                   <input id="parkingPKName" placeholder="Nama PK" />
                 </div>
+                <div class="ph-item">
+                  <label for="parkingSearch" class="small muted">Cari Parkir</label>
+                  <div style="display:flex;gap:8px;align-items:center">
+                    <input id="parkingSearch" placeholder="Cari plat / unit / nama / telefon..." style="min-width:220px;padding:8px;border-radius:8px;border:1px solid var(--input-border);" />
+                    <button id="parkingClearSearchBtn" type="button" class="btn-ghost" title="Kosongkan carian">✕</button>
+                  </div>
+                </div>
+                  <!-- parking-specific search removed; use the global search box instead -->
                 <div class="ph-item">
                   <button id="parkingSaveAll" class="btn">Simpan Semua</button>
                 </div>

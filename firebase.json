@@ -1,0 +1,16 @@
+{
+  "functions": {
+    "source": "functions"
+  },
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "hosting": {
+    "public": ".",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "rewrites": [
+      { "source": "/dashboard", "destination": "/dashboard.html" },
+      { "source": "/visitor", "destination": "/visitor.html" }
+    ]
+  }
+}

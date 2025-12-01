@@ -1,0 +1,45 @@
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAdmin() {
+      return request.auth != null && request.auth.token.admin == true;
+    }
+
+    // dedupeKeys must only be written/read by server-side code using Admin SDK
+    // Prevent client writes so clients cannot attempt to claim keys directly.
+    match /dedupeKeys/{docId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // Responses: allow visitors to CREATE (for public submissions) but validate inputs
+    // Only allow client-side create; updates and deletes must be done by admins.
+    match /responses/{respId} {
+      allow create: if validateResponseCreate();
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Parking, audit and other admin collections: admin-only
+    match /parkingSlots/{doc} { allow read, write: if isAdmin(); }
+    match /audit/{doc} { allow read, write: if isAdmin(); }
+
+    // Fallback deny all other accesses by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper validation for visitor submissions (simple, conservative checks)
+    function validateResponseCreate() {
+      // required fields
+      return request.resource.data.hostUnit is string
+        && request.resource.data.visitorName is string
+        && request.resource.data.eta is timestamp
+        // impose reasonable size limits
+        && request.resource.data.hostUnit.size() <= 64
+        && request.resource.data.visitorName.size() <= 256
+        && (request.resource.data.visitorPhone == null || request.resource.data.visitorPhone is string)
+        // restrict status so clients cannot set Checked In/Out directly
+        && (request.resource.data.status == 'Pending' || !('status' in request.resource.data));
+    }
+  }
+}

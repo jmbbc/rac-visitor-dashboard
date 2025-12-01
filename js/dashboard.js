@@ -25,6 +25,26 @@ function toast(msg, ok = true){ const t = document.createElement('div'); t.class
   t.setAttribute('role','status'); t.setAttribute('aria-live','polite'); t.setAttribute('aria-atomic','true');
   document.body.appendChild(t); setTimeout(()=>t.remove(),3000); }
 function escapeHtml(s){ if (!s) return ''; return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// highlight occurrences of the needle (case-insensitive) in the given text.
+// returns an HTML-safe string with <span class="search-match">wrapped</span> matches
+function highlightString(raw, needle) {
+  if (!raw) return '';
+  const text = String(raw);
+  const esc = escapeHtml(text);
+  if (!needle) return esc;
+  const lower = esc.toLowerCase();
+  const n = needle.toLowerCase();
+  let out = '';
+  let start = 0;
+  let idx = -1;
+  while ((idx = lower.indexOf(n, start)) !== -1) {
+    out += esc.slice(start, idx) + `<span class="search-match">` + esc.slice(idx, idx + n.length) + `</span>`;
+    start = idx + n.length;
+  }
+  out += esc.slice(start);
+  return out;
+}
 function normalizePhoneForWhatsapp(raw){
   let p = String(raw || '').trim();
   p = p.replace(/[\s\-().]/g,'');
@@ -46,79 +66,221 @@ const categoryClassMap = {
 };
 
 /* ---------- DOM refs ---------- */
+// central DOM refs (declare even if some elements may not exist in current HTML)
 const loginBox = document.getElementById('loginBox');
+const loginEmail = document.getElementById('loginEmail');
+const loginPass = document.getElementById('loginPass');
 const loginBtn = document.getElementById('loginBtn');
 const logoutBtn = document.getElementById('logoutBtn');
 const loginMsg = document.getElementById('loginMsg');
+
 const dashboardArea = document.getElementById('dashboardArea');
 const who = document.getElementById('who');
-const listAreaSummary = document.getElementById('listAreaSummary');
-const listAreaCheckedIn = document.getElementById('listAreaCheckedIn');
-const reloadBtn = document.getElementById('reloadBtn');
-const filterDate = document.getElementById('filterDate');
+const kpiWrap = document.getElementById('kpiWrap');
 const todayLabel = document.getElementById('todayLabel');
 const todayTime = document.getElementById('todayTime');
-const kpiWrap = document.getElementById('kpiWrap');
-const injectedControls = document.getElementById('injectedControls');
+
+const filterDate = document.getElementById('filterDate');
+const reloadBtn = document.getElementById('reloadBtn');
+const exportCSVBtn = document.getElementById('exportCSVBtn'); // optional (may be removed from template)
 
 const navSummary = document.getElementById('navSummary');
 const navCheckedIn = document.getElementById('navCheckedIn');
 const navParking = document.getElementById('navParking');
-const exportCSVBtn = document.getElementById('exportCSVBtn');
 
-// auto-refresh timer handle
+const listAreaSummary = document.getElementById('listAreaSummary');
+const listAreaCheckedIn = document.getElementById('listAreaCheckedIn');
+
+const globalSearchInput = document.getElementById('globalSearch');
+const clearSearchBtn = document.getElementById('clearSearchBtn');
+
+const parkingSearchInput = document.getElementById('parkingSearch');
+const parkingClearBtn = document.getElementById('parkingClearSearchBtn');
+const parkingSaveAll = document.getElementById('parkingSaveAll');
+const parkingMasuk = document.getElementById('parkingMasuk');
+const parkingLuar = document.getElementById('parkingLuar');
+
+// in-memory cache + search state
+let responseCache = { date: '', rows: [] };
+let currentSearchQuery = '';
+let currentParkingSearchQuery = '';
 let autoRefreshTimer = null;
-// lightweight in-memory cache to reduce duplicate reads
-// responseCache caches per-day query results (dateStr -> rows)
-const responseCache = { date: null, rows: [] };
-// weekCache keyed by week start date (yyyy-mm-dd) -> rows for that week
-const weekResponseCache = Object.create(null);
 
-function startAutoRefresh(intervalMs = 180_000){
-  try{
-    if (autoRefreshTimer) clearInterval(autoRefreshTimer);
-    autoRefreshTimer = setInterval(()=>{
-      console.info('[autoRefresh] running loadTodayList');
-      loadTodayList();
-    }, intervalMs);
-    console.info('[autoRefresh] started interval', intervalMs);
-    return autoRefreshTimer;
-  } catch(e) { console.warn('startAutoRefresh err', e); }
+// aggregation stats helper state (used to avoid fetching full rows in some cases)
+let aggCountsOK = false;
+let aggTotal = 0, aggCheckedIn = 0, aggCheckedOut = 0;
+
+// cache for weekly queries used by parking calendar
+let weekResponseCache = {};
+
+// small helper to periodically refresh the current view while dashboard is visible
+function startAutoRefresh(intervalMs = 60_000) {
+  if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+  autoRefreshTimer = setInterval(() => {
+    try { loadTodayList(); } catch (e) { console.warn('autoRefresh load failed', e); }
+  }, intervalMs);
 }
 
+/**
+ * filterRowsByQuery(rows, q) -> returns subset of rows matching a textual query
+ * The function searches key fields (visitor name/phone, host name/unit/phone, vehicles, note, role)
+ */
+function filterRowsByQuery(rows, q){
+  if (!q || !q.trim()) return rows;
+  const needle = String(q).trim().toLowerCase();
+  try{
+    return (rows || []).filter(r => {
+      try{
+        const parts = [];
+        if (r.visitorName) parts.push(String(r.visitorName));
+        if (r.visitorPhone) parts.push(String(r.visitorPhone));
+        if (r.hostName) parts.push(String(r.hostName));
+        if (r.hostPhone) parts.push(String(r.hostPhone));
+        if (r.hostUnit) parts.push(String(r.hostUnit));
+        if (r.vehicleNo) parts.push(String(r.vehicleNo));
+        if (Array.isArray(r.vehicleNumbers)) parts.push(r.vehicleNumbers.join(' '));
+        if (r.entryDetails) parts.push(String(r.entryDetails));
+        if (r.role) parts.push(String(r.role));
+        if (r.note) parts.push(String(r.note));
+        if (r.id) parts.push(String(r.id));
+        const hay = parts.join(' ').toLowerCase();
+        return hay.includes(needle);
+      }catch(e){ return false; }
+    });
+  }catch(e){ return rows || []; }
+}
 
-/* ---------- debug ---------- */
-console.info('dashboard.js loaded. __AUTH?', !!window.__AUTH, '__FIRESTORE?', !!window.__FIRESTORE);
+/*
+ * Apply the correct scoped search and re-render affected views.
+ * scope: 'summary' | 'parking' | 'checkedin' (defaults to current visible page: summary)
+ */
+function applySearchFilterAndRender(scope = 'summary'){
+  scope = scope || 'summary';
+  const dateKey = responseCache.date || (filterDate && filterDate.value) || isoDateString(new Date());
+  const rows = Array.isArray(responseCache.rows) ? responseCache.rows : [];
 
-/* ---------- auth handlers ---------- */
-loginBtn.addEventListener('click', async ()=>{
-  const email = document.getElementById('loginEmail').value.trim();
-  const pass = document.getElementById('loginPass').value;
-  showLoginMsg(loginMsg, 'Log masuk...');
-  try {
-    // prepare aggregation flag/values
-    let aggCountsOK = false;
-    let aggTotal = 0, aggCheckedIn = 0, aggCheckedOut = 0;
-    const cred = await signInWithEmailAndPassword(window.__AUTH, email, pass);
-    console.info('Login success:', cred.user && (cred.user.email || cred.user.uid));
-    showLoginMsg(loginMsg, 'Berjaya log masuk.');
-  } catch (err) {
-    console.error('login err detailed', err);
-    const code = err && err.code ? err.code : 'unknown_error';
-    const msg = err && err.message ? err.message : String(err);
-    showLoginMsg(loginMsg, `Gagal log masuk: ${code} — ${msg}`, false);
+  if (scope === 'summary'){
+    const rowsToShow = currentSearchQuery ? filterRowsByQuery(rows, currentSearchQuery) : rows;
+    try { renderList(rowsToShow, listAreaSummary, false); } catch(e){ console.warn('renderList failed', e); }
+  } else if (scope === 'checkedin'){
+    let checkedRows = rows.filter(r => r.status === 'Checked In');
+    checkedRows = currentCheckedInSearchQuery ? filterRowsByQuery(checkedRows, currentCheckedInSearchQuery) : checkedRows;
+    try { renderCheckedInList(checkedRows); } catch(e){ console.warn('renderCheckedInList failed', e); }
+  } else if (scope === 'parking'){
+    // For parking we re-render summary/weekly views which read from responseCache or fetch as needed
+    try { if (typeof renderParkingLotSummary === 'function') renderParkingLotSummary(dateKey); } catch(e){ console.warn('renderParkingLotSummary failed', e); }
+    try { if (typeof renderParkingWeekCalendar === 'function') renderParkingWeekCalendar(dateKey); } catch(e){ console.warn('renderParkingWeekCalendar failed', e); }
+    try { if (typeof renderAllSlots === 'function') renderAllSlots(); } catch(e){}
   }
-});
+}
+function renderCheckedInList(rows){
+  const containerEl = listAreaCheckedIn;
+  if (!containerEl) return;
+  if (!rows || rows.length === 0) { containerEl.innerHTML = '<div class="small">Tiada rekod</div>'; return; }
 
-logoutBtn.addEventListener('click', async ()=> {
-  try {
-    await signOut(window.__AUTH);
-    showLoginMsg(loginMsg, 'Anda telah log keluar.', true);
-  } catch (err) {
-    console.error('logout err', err);
-    showLoginMsg(loginMsg, 'Gagal log keluar', false);
-  }
-});
+  // Group rows by category
+  const groups = {};
+  rows.forEach(r => {
+    const c = determineCategory(r);
+    groups[c] = groups[c] || [];
+    groups[c].push(r);
+  });
+
+  // preferred order
+  const order = ['Pelawat','Kontraktor','Pindah barang','Penghantaran Barang','Pelawat Khas','Kenderaan','Penghuni'];
+  const keys = Object.keys(groups).sort((a,b) => {
+    const ia = order.indexOf(a); const ib = order.indexOf(b);
+    if (ia === -1 && ib === -1) return a.localeCompare(b);
+    if (ia === -1) return 1; if (ib === -1) return -1; return ia - ib;
+  });
+
+  containerEl.innerHTML = '';
+
+  keys.forEach(k => {
+    const list = groups[k] || [];
+    const catClass = categoryClassMap[k] || 'cat-lain';
+
+    const details = document.createElement('details');
+    details.className = `checkedin-group card card-tight ${catClass}`;
+    details.open = true; // default expanded
+
+    const summary = document.createElement('summary');
+    summary.className = 'checkedin-group-summary';
+    summary.innerHTML = `<div style="display:flex;align-items:center;gap:10px"><strong style="font-weight:800">${escapeHtml(k)}</strong><span class="small">(${list.length})</span></div>`;
+
+    // Build a mini-table per category for compact rows (same columns as summary)
+    const tableWrap = document.createElement('div');
+    tableWrap.className = 'table-wrap';
+    const table = document.createElement('table');
+    table.className = 'table';
+    const thead = document.createElement('thead');
+    thead.innerHTML = `<tr>
+        <th>Nama Pelawat</th>
+        <th>Unit / Tuan Rumah</th>
+        <th>Tarikh masuk</th>
+        <th>Tarikh keluar</th>
+        <th>Kenderaan</th>
+        <th>Status</th>
+        <th>Aksi</th>
+      </tr>`;
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    list.forEach(r => {
+      const tr = document.createElement('tr');
+
+      // Name + small host details
+      const tdName = document.createElement('td');
+      tdName.innerHTML = highlightString(r.visitorName || '-', currentCheckedInSearchQuery) + (r.entryDetails ? '<div class="small">'+escapeHtml(r.entryDetails)+'</div>' : '');
+
+      // Host unit / name
+      const hostHtml = (r.hostUnit ? escapeHtml(r.hostUnit) : '') + (r.hostName ? '<div class="small">'+escapeHtml(r.hostName)+'</div>' : '');
+      const tdHost = document.createElement('td'); tdHost.innerHTML = highlightString(hostHtml, currentCheckedInSearchQuery);
+
+      const tdEta = document.createElement('td'); tdEta.textContent = formatDateOnly(r.eta);
+      const tdEtd = document.createElement('td'); tdEtd.textContent = formatDateOnly(r.etd);
+
+      let vehicleDisplay = '-';
+      if (Array.isArray(r.vehicleNumbers) && r.vehicleNumbers.length) vehicleDisplay = r.vehicleNumbers.join(', ');
+      else if (r.vehicleNo) vehicleDisplay = r.vehicleNo;
+      const tdVehicle = document.createElement('td'); tdVehicle.innerHTML = highlightString(vehicleDisplay, currentCheckedInSearchQuery);
+
+      const statusClass = r.status === 'Checked In' ? 'pill-in' : (r.status === 'Checked Out' ? 'pill-out' : 'pill-pending');
+      const tdStatus = document.createElement('td'); tdStatus.innerHTML = `<span class="status-pill ${statusClass}">${escapeHtml(r.status || 'Pending')}</span>`;
+
+      const tdActions = document.createElement('td');
+      tdActions.innerHTML = `<div class="actions"><button class="btn btn-ghost" data-action="out" data-id="${escapeHtml(r.id)}">Check Out</button></div>`;
+
+      tr.appendChild(tdName);
+      tr.appendChild(tdHost);
+      tr.appendChild(tdEta);
+      tr.appendChild(tdEtd);
+      tr.appendChild(tdVehicle);
+      tr.appendChild(tdStatus);
+      tr.appendChild(tdActions);
+
+      tbody.appendChild(tr);
+    });
+
+    table.appendChild(tbody);
+    tableWrap.appendChild(table);
+
+    details.appendChild(summary);
+    details.appendChild(tableWrap);
+    containerEl.appendChild(details);
+  });
+
+  // wire up actions
+  containerEl.querySelectorAll('button[data-action]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-id');
+      const action = btn.getAttribute('data-action');
+      if (!id) return;
+      if (action === 'out') await doStatusUpdate(id, 'Checked Out');
+      else if (action === 'in') await doStatusUpdate(id, 'Checked In');
+    });
+  });
+}
 
 /* ---------- auth state change ---------- */
 onAuthStateChanged(window.__AUTH, user => {
@@ -134,6 +296,8 @@ onAuthStateChanged(window.__AUTH, user => {
     todayLabel.textContent = formatDateOnly(now);
     todayTime.textContent = now.toLocaleTimeString();
     if (!filterDate.value) filterDate.value = isoDateString(now);
+    // default to summary page on login so the correct search box is visible
+    try { showPage('summary'); } catch(e) {}
     loadTodayList();
     startAutoRefresh();
   } else {
@@ -163,6 +327,67 @@ if (navSummary) navSummary.addEventListener('click', ()=> { showPage('summary');
 if (navCheckedIn) navCheckedIn.addEventListener('click', ()=> { showPage('checkedin'); });
 if (exportCSVBtn) exportCSVBtn.addEventListener('click', ()=> { exportCSVForToday(); });
 
+// wire up global search input (filters the summary view client-side using cached rows)
+if (globalSearchInput) {
+  globalSearchInput.addEventListener('input', (e) => {
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(() => {
+      currentSearchQuery = (e.target.value || '').trim();
+      applySearchFilterAndRender('summary');
+    }, 200);
+  });
+}
+if (clearSearchBtn) {
+  clearSearchBtn.addEventListener('click', () => {
+    if (globalSearchInput) globalSearchInput.value = '';
+    currentSearchQuery = '';
+    applySearchFilterAndRender('summary');
+  });
+}
+
+// parking-only search handlers (independent scope)
+if (parkingSearchInput) {
+  parkingSearchInput.addEventListener('input', (e) => {
+    clearTimeout(parkingSearchDebounceTimer);
+    parkingSearchDebounceTimer = setTimeout(() => {
+      currentParkingSearchQuery = (e.target.value || '').trim();
+      applySearchFilterAndRender('parking');
+    }, 200);
+  });
+}
+
+if (parkingClearBtn) {
+  parkingClearBtn.addEventListener('click', () => {
+    if (parkingSearchInput) parkingSearchInput.value = '';
+    currentParkingSearchQuery = '';
+    applySearchFilterAndRender('parking');
+  });
+}
+
+// checked-in search handlers (independent scope)
+const checkedInSearchInput = document.getElementById('checkedInSearch');
+const clearCheckedInBtn = document.getElementById('clearCheckedInSearchBtn');
+let currentCheckedInSearchQuery = '';
+let checkedInSearchDebounceTimer = null;
+
+if (checkedInSearchInput) {
+  checkedInSearchInput.addEventListener('input', (e) => {
+    clearTimeout(checkedInSearchDebounceTimer);
+    checkedInSearchDebounceTimer = setTimeout(() => {
+      currentCheckedInSearchQuery = (e.target.value || '').trim();
+      applySearchFilterAndRender('checkedin');
+    }, 200);
+  });
+}
+
+if (clearCheckedInBtn) {
+  clearCheckedInBtn.addEventListener('click', () => {
+    if (checkedInSearchInput) checkedInSearchInput.value = '';
+    currentCheckedInSearchQuery = '';
+    applySearchFilterAndRender('checkedin');
+  });
+}
+
 /* ---------- core fetch ---------- */
 async function loadListForDateStr(yyyymmdd){
   console.info('[loadListForDateStr] called', yyyymmdd);
@@ -178,20 +403,8 @@ async function loadListForDateStr(yyyymmdd){
   try {
     // check cache to avoid re-reading the same date
     if (responseCache.date === yyyymmdd && Array.isArray(responseCache.rows) && responseCache.rows.length) {
-      const rows = responseCache.rows;
-      // KPIs
-      let pending = 0, checkedIn = 0, checkedOut = 0;
-      rows.forEach(r => {
-        if (!r.status || r.status === 'Pending') pending++;
-        else if (r.status === 'Checked In') checkedIn++;
-        else if (r.status === 'Checked Out') checkedOut++;
-      });
-      renderKPIs(pending, checkedIn, checkedOut);
-
-      // render pages from cached rows
-      renderList(rows, listAreaSummary, false);
-      renderCheckedInList(rows.filter(r => r.status === 'Checked In'));
-      console.info('[loadListForDateStr] used cache for', yyyymmdd, 'rows:', rows.length);
+      // Render directly from cache (we honor active search filters in applySearchFilterAndRender)
+      applySearchFilterAndRender();
       return;
     }
 
@@ -219,8 +432,20 @@ async function loadListForDateStr(yyyymmdd){
         aggCountsOK = true;
         aggTotal = total; aggCheckedIn = checkedIn; aggCheckedOut = checkedOut;
       } catch (countErr) {
-        // If counts fail (older SDK or network) we'll fall back to counting from rows
-        console.warn('Aggregation counts failed, falling back to in-memory counts later', countErr);
+        // If counts fail (older SDK, missing index or network), fall back to computing from rows.
+        // Provide a clearer console message and, when present, show the console-supplied index link.
+        try {
+          const msg = String(countErr && countErr.message ? countErr.message : countErr);
+          const urlMatch = msg.match(/https?:\/\/[^\s]+/);
+          if (countErr && countErr.code === 'failed-precondition') {
+            console.warn('Aggregation counts failed (requires an index). Falling back to in-memory counts.');
+            if (urlMatch && urlMatch[0]) console.warn('Create the index here:', urlMatch[0]);
+          } else {
+            console.warn('Aggregation counts failed, falling back to in-memory counts later', countErr);
+          }
+        } catch (e) {
+          console.warn('Aggregation counts failed, falling back to in-memory counts later', countErr);
+        }
       }
       const col = collection(window.__FIRESTORE, 'responses');
       const q = query(col, where('eta', '>=', Timestamp.fromDate(from)), where('eta', '<', Timestamp.fromDate(to)), orderBy('eta','asc'));
@@ -252,9 +477,11 @@ async function loadListForDateStr(yyyymmdd){
       renderKPIs(pending, checkedIn, checkedOut);
     }
 
+    // If a search query is active, filter the rows for display only
+    const rowsToShow = currentSearchQuery ? filterRowsByQuery(rows, currentSearchQuery) : rows;
     // render pages
-    renderList(rows, listAreaSummary, false);
-    renderCheckedInList(rows.filter(r => r.status === 'Checked In'));
+    renderList(rowsToShow, listAreaSummary, false);
+    renderCheckedInList(rowsToShow.filter(r => r.status === 'Checked In'));
     console.info('[loadListForDateStr] rendered summary + checked-in lists, rows:', rows.length);
   } catch (err) {
     console.error('loadList err', err);
@@ -382,124 +609,7 @@ function renderList(rows, containerEl, compact=false, highlightIds = new Set()){
   // No generic 'Isi Butiran' handlers here (checked-in edit removed)
 }
 
-/* ---------- Checked-In list (grouped by category) ---------- */
-function renderCheckedInList(rows){
-  const containerEl = listAreaCheckedIn;
-  if (!rows || rows.length === 0) { containerEl.innerHTML = '<div class="small">Tiada rekod</div>'; return; }
-
-  // group rows by category
-  const groups = {};
-  rows.forEach(r => {
-    const c = determineCategory(r);
-    groups[c] = groups[c] || [];
-    groups[c].push(r);
-  });
-
-  // preferred order of categories
-  const order = ['Pelawat','Kontraktor','Pindah barang','Penghantaran Barang','Pelawat Khas','Kenderaan','Penghuni'];
-  const keys = Object.keys(groups).sort((a,b) => {
-    const ia = order.indexOf(a); const ib = order.indexOf(b);
-    if (ia === -1 && ib === -1) return a.localeCompare(b);
-    if (ia === -1) return 1; if (ib === -1) return -1; return ia - ib;
-  });
-
-  // build grouped card
-  const wrap = document.createElement('div');
-  wrap.className = 'card card-tight';
-  keys.forEach(k => {
-    const list = groups[k];
-    const catClass = categoryClassMap[k] || 'cat-lain';
-    const groupEl = document.createElement('div');
-    groupEl.className = `parking-summary-group ${catClass}`;
-
-    // header (coloured by category via catClass)
-    const header = document.createElement('div');
-    header.className = 'parking-summary-header';
-
-    // create accessible toggle id for tbody
-    const tidyKey = String(k).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'') || 'group';
-    const tbodyId = `group-${tidyKey}-${Math.random().toString(36).slice(2,6)}`;
-
-    header.innerHTML = `
-      <div style="font-weight:700; display:flex; align-items:center; gap:12px">
-        <button aria-controls="${tbodyId}" aria-expanded="true" class="group-toggle" title="Togol kumpulan ${escapeHtml(k)}">▾</button>
-        <span class="group-title ${catClass}">${escapeHtml(k)}</span>
-        <span class="small muted" style="margin-left:8px">(${list.length})</span>
-      </div>`;
-    groupEl.appendChild(header);
-
-    const table = document.createElement('table');
-    table.className = 'table';
-    table.innerHTML = `<thead><tr>
-      <th>Kategori</th>
-      <th>Unit / Tuan Rumah</th>
-      <th>Tarikh masuk</th>
-      <th>Tarikh keluar</th>
-      <th>Kenderaan</th>
-      <th>Status</th>
-      <th>Aksi</th>
-    </tr></thead>`;
-    const tbody = document.createElement('tbody');
-    tbody.id = tbodyId;
-
-    list.forEach(r => {
-      const vehicleDisplay = (Array.isArray(r.vehicleNumbers) && r.vehicleNumbers.length) ? r.vehicleNumbers.join(', ') : (r.vehicleNo || '-');
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td><span class="cat-badge ${catClass}">${escapeHtml(k)}</span></td>
-        <td>${escapeHtml(r.hostUnit || '')}${r.hostName ? '<div class="small">'+escapeHtml(r.hostName)+'</div>' : ''}</td>
-        <td>${formatDateOnly(r.eta)}</td>
-        <td>${formatDateOnly(r.etd)}</td>
-        <td>${escapeHtml(vehicleDisplay)}</td>
-        <td><span class="status-pill ${r.status === 'Checked In' ? 'pill-in' : (r.status === 'Checked Out' ? 'pill-out' : 'pill-pending')}">${escapeHtml(r.status || 'Pending')}</span></td>
-        <td>
-          <div class="actions">
-            <button class="btn" data-action="in" data-id="${r.id}">Check In</button>
-            <button class="btn btn-ghost" data-action="out" data-id="${r.id}">Check Out</button>
-          </div>
-        </td>
-      `;
-      tbody.appendChild(tr);
-    });
-
-      // attach toggle handler to header button
-      setTimeout(()=>{
-        const btn = header.querySelector('.group-toggle');
-        if (!btn) return;
-        btn.addEventListener('click', ()=>{
-          const expanded = btn.getAttribute('aria-expanded') === 'true';
-          btn.setAttribute('aria-expanded', String(!expanded));
-          if (!expanded) {
-            // expand
-            tbody.style.display = '';
-            groupEl.classList.remove('collapsed');
-            btn.textContent = '▾';
-          } else {
-            // collapse
-            tbody.style.display = 'none';
-            groupEl.classList.add('collapsed');
-            btn.textContent = '▸';
-          }
-        });
-      }, 0);
-
-    table.appendChild(tbody);
-    groupEl.appendChild(table);
-    wrap.appendChild(groupEl);
-  });
-
-  containerEl.innerHTML = '';
-  containerEl.appendChild(wrap);
-
-  // attach button handlers
-  containerEl.querySelectorAll('button[data-action]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const id = btn.getAttribute('data-id');
-      const action = btn.getAttribute('data-action');
-      await doStatusUpdate(id, action === 'in' ? 'Checked In' : 'Checked Out');
-    });
-  });
-}
+/* Duplicate (broken) checked-in renderer removed — the clean implementation is earlier in this file. */
 
 /* ---------- Checked-In list ---------- */
 
@@ -723,7 +833,28 @@ function showPage(key){
     const lbl = document.querySelector('label[for="filterDate"]');
     if (lbl) lbl.style.display = (key === 'summary' ? '' : 'none');
     if (filterDate) filterDate.style.display = (key === 'summary' ? '' : 'none');
+    // show global search only on the summary page
+    const gwrap = document.getElementById('globalSearchWrap');
+    if (gwrap) gwrap.style.display = (key === 'summary' ? '' : 'none');
+    // show checked-in search only on checked-in page
+    const cwrap = document.getElementById('checkedInSearchWrap');
+    if (cwrap) cwrap.style.display = (key === 'checkedin' ? '' : 'none');
+    // show parking-specific search only on parking page
+    try {
+      const psearch = document.getElementById('parkingSearch');
+      if (psearch && psearch.closest) {
+        const parent = psearch.closest('.ph-item');
+        if (parent) parent.style.display = (key === 'parking' ? '' : 'none');
+      }
+    } catch(e){}
   } catch(e) {}
+
+  // After switching pages, trigger the appropriate scoped search render
+  try {
+    if (key === 'summary') applySearchFilterAndRender('summary');
+    else if (key === 'checkedin') applySearchFilterAndRender('checkedin');
+    else if (key === 'parking') applySearchFilterAndRender('parking');
+  } catch(e) { /* ignore */ }
 }
 
 /* initialize filterDate with today if empty */
@@ -793,15 +924,30 @@ document.addEventListener('DOMContentLoaded', ()=>{ /* ready */ });
     // console.debug to help trace rendering
     //console.debug('[parking] renderSlotRow', slotId);
     const data = slotCache[slotId] || {};
+    // When a global search is active, only render slots that match the query (vehicle or unit)
+    const q = (currentParkingSearchQuery || '').trim().toLowerCase();
+    if (q) {
+      const vehicle = String(data.vehicle || '').toLowerCase();
+      const unit = String(data.unit || '').toLowerCase();
+      if (!(vehicle.includes(q) || unit.includes(q))) {
+        // don't render non-matching slot (so results appear filtered)
+        return;
+      }
+    }
     const div = document.createElement('div');
     div.className = 'parking-slot' + (data.vehicle ? ' filled' : '');
     div.dataset.slot = slotId;
+    // build inner HTML, highlighting matched portions when applicable
+    const needle = (currentParkingSearchQuery || '').trim();
+    const vehHtml = data.vehicle ? highlightString(data.vehicle, needle) : '<span class="parking-empty">Kosong</span>';
+    const unitHtml = data.unit ? highlightString(data.unit, needle) : '';
+
     div.innerHTML = `
       <div class="meta">
         <div class="slot-num">${escapeHtml(slotId)}</div>
         <div class="slot-info">
-          <div class="small">${data.vehicle ? escapeHtml(data.vehicle) : '<span class="parking-empty">Kosong</span>'}</div>
-          <div class="small">${data.unit ? escapeHtml(data.unit) : ''}${data.eta ? ' • '+escapeHtml(data.eta) : ''}${data.etd ? ' • '+escapeHtml(data.etd) : ''}</div>
+          <div class="small">${vehHtml}</div>
+          <div class="small">${unitHtml ? unitHtml : ''}${data.eta ? ' • '+escapeHtml(data.eta) : ''}${data.etd ? ' • '+escapeHtml(data.etd) : ''}</div>
         </div>
       </div>
       <div class="actions">
@@ -883,6 +1029,13 @@ document.addEventListener('DOMContentLoaded', ()=>{ /* ready */ });
       leftGrid.className = 'lot-grid';
       masukSlots.forEach(slotId => {
         const data = slotCache[slotId] || {};
+        // filter by parking-specific search when active
+        if (currentParkingSearchQuery && currentParkingSearchQuery.trim()) {
+          const q = currentParkingSearchQuery.trim().toLowerCase();
+          const vehicle = String(data.vehicle || '').toLowerCase();
+          const unit = String(data.unit || '').toLowerCase();
+          if (!(vehicle.includes(q) || unit.includes(q))) return; // skip non-matching chips
+        }
         const chip = document.createElement('button');
         chip.className = 'lot-chip' + (data.vehicle ? ' filled' : '');
         chip.type = 'button';
@@ -901,10 +1054,20 @@ document.addEventListener('DOMContentLoaded', ()=>{ /* ready */ });
       rightGrid.className = 'lot-grid';
       luarSlots.forEach(slotId => {
         const data = slotCache[slotId] || {};
+        if (currentParkingSearchQuery && currentParkingSearchQuery.trim()) {
+          const q = currentParkingSearchQuery.trim().toLowerCase();
+          const vehicle = String(data.vehicle || '').toLowerCase();
+          const unit = String(data.unit || '').toLowerCase();
+          if (!(vehicle.includes(q) || unit.includes(q))) return;
+        }
         const chip = document.createElement('button');
         chip.className = 'lot-chip' + (data.vehicle ? ' filled' : '');
         chip.type = 'button';
-        chip.textContent = slotId + (data.vehicle ? ` • ${data.vehicle}` : ' • Kosong');
+        // highlight a matching vehicle or unit in the chip text
+        const needle = (currentParkingSearchQuery || '').trim();
+        const leftText = escapeHtml(slotId);
+        const rightText = data.vehicle ? highlightString(data.vehicle, needle) : (data.unit ? highlightString(data.unit, needle) : '• Kosong');
+        chip.innerHTML = `${leftText} • ${rightText}`;
         chip.dataset.slot = slotId;
         chip.addEventListener('click', ()=> openSlotModal(slotId));
         rightGrid.appendChild(chip);
@@ -1135,8 +1298,12 @@ document.addEventListener('DOMContentLoaded', ()=>{ /* ready */ });
         responseCache.rows = rows;
       }
 
+      // if a global search query is active, apply the same filtering to the rows used for the parking summaries
+      // use the global search query for parking lists
+      const usableRows = currentParkingSearchQuery ? filterRowsByQuery(rows, currentParkingSearchQuery) : rows;
+
       // filter only Pelawat category who are staying over (Bermalam)
-      const pelawatRows = rows.filter(r => determineCategory(r) === 'Pelawat' && String((r.stayOver || '').toLowerCase()) === 'yes');
+      const pelawatRows = usableRows.filter(r => determineCategory(r) === 'Pelawat' && String((r.stayOver || '').toLowerCase()) === 'yes');
 
       const total = pelawatRows.length;
       const assigned = pelawatRows.filter(r => r.parkingLot && String(r.parkingLot).trim()).length;
@@ -1235,8 +1402,12 @@ document.addEventListener('DOMContentLoaded', ()=>{ /* ready */ });
         weekResponseCache[weekKey] = rows;
       }
 
+      // Apply global search to weekly rows as well to allow parking search
+      // weekly calendar uses the global search query when present
+      const usableWeekRows = currentParkingSearchQuery ? filterRowsByQuery(rows, currentParkingSearchQuery) : rows;
+
       // Only Pelawat category AND staying over (Bermalam)
-      const pelawat = rows.filter(r => determineCategory(r) === 'Pelawat' && String((r.stayOver || '').toLowerCase()) === 'yes');
+      const pelawat = usableWeekRows.filter(r => determineCategory(r) === 'Pelawat' && String((r.stayOver || '').toLowerCase()) === 'yes');
 
       // Build per-plate counts across the week (count of distinct days a plate appears on)
       // We'll use this to mark plates that appear on multiple days
@@ -1381,7 +1552,11 @@ document.addEventListener('DOMContentLoaded', ()=>{ /* ready */ });
             const unit = r.unit ? ` — ${r.unit}` : '';
             // if plate appears on more than one day this week, mark it
             const count = plateCounts[r.plate] || 0;
-            item.textContent = `${r.plate}${unit}`;
+            // render plate + unit with highlighted matches when parking search query is active
+            const needle = currentParkingSearchQuery && currentParkingSearchQuery.trim() ? currentParkingSearchQuery.trim() : '';
+            const plateHtml = highlightString(r.plate || '', needle);
+            const unitHtml = unit ? highlightString(unit, needle) : '';
+            item.innerHTML = plateHtml + (unitHtml ? `${unitHtml}` : '');
             if (count > 1) {
               item.classList.add('pw-vehicle-duplicate');
               item.setAttribute('data-dup-count', String(count));

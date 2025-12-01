@@ -120,6 +120,14 @@ body{
 .pw-vehicle-list.multi-cols { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; }
 .pw-vehicle-item:hover { background: rgba(37,99,235,0.04); }
 
+/* highlight matched search substrings inside calendar / lists */
+.search-match {
+  background: linear-gradient(90deg, rgba(245,158,11,0.14), rgba(37,99,235,0.06));
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-weight: 700;
+}
+
 /* Make parking vehicle item text denser specifically in the Parking page (web page mode) */
 #pageParking .pw-vehicle-item { font-size: 12px; }
 
@@ -300,6 +308,34 @@ button[disabled]{ opacity:.6; cursor:not-allowed; }
 
 /* conflict highlight */
 tr.conflict td{ background: rgba(255,243,205,0.6) }
+
+/* Checked-in page: make checked-in table sit inside a card and match screenshot visuals */
+#pageCheckedIn .table-wrap{ background: var(--surface); border-radius:12px; padding:8px; box-shadow: var(--elev-1); border:1px solid var(--input-border); }
+#pageCheckedIn .table thead th{ background:transparent; font-weight:700; padding:12px 14px; color:var(--text-900); }
+#pageCheckedIn .table tbody td{ padding:12px 14px; vertical-align:middle; }
+#pageCheckedIn .table tbody tr{ background: transparent; }
+
+/* Make visitor name more prominent, host info smaller */
+#pageCheckedIn .table td .checkedin-name{ font-weight:800; font-size:15px; margin-bottom:6px; color:var(--text-900); }
+#pageCheckedIn .table td .small { color:var(--muted); margin-top:4px }
+
+/* Action buttons — primary (Check In) vs ghost (Check Out) sizing */
+#pageCheckedIn .table td .actions .btn{ padding:8px 12px; font-size:14px; min-height:36px; border-radius:10px; }
+#pageCheckedIn .table td .actions .btn-ghost{ background:transparent !important; color:var(--text-900) !important; border:1px solid var(--input-border) !important; }
+
+/* Slightly compact the checked-in table on narrow screens */
+@media (max-width: 720px){
+  #pageCheckedIn .table th, #pageCheckedIn .table td { padding:10px 8px; font-size:13px; }
+  #pageCheckedIn .table td .checkedin-name{ font-size:14px; }
+}
+
+/* Checked-in collapsible group styles */
+#pageCheckedIn .checkedin-group { margin-bottom:10px; border-radius:10px; padding:8px; }
+#pageCheckedIn .checkedin-group summary { list-style: none; cursor: pointer; padding:8px 10px; border-radius:8px; display:flex; justify-content:space-between; align-items:center; background:transparent; }
+#pageCheckedIn .checkedin-group summary::marker { display:none; }
+#pageCheckedIn .checkedin-group-summary { display:flex; align-items:center; gap:10px; }
+#pageCheckedIn details[open] summary { box-shadow: var(--elev-1); border-radius:8px; }
+#pageCheckedIn .checkedin-group .table-wrap { margin-top:8px; }
 
 /* -------------------------
    Form justify / alignment
