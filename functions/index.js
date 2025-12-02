@@ -4,6 +4,11 @@ const admin = require('firebase-admin');
 admin.initializeApp();
 const db = admin.firestore();
 
+// Dedupe time window (minutes) - server will treat any existing dedupe key younger than
+// this window as a duplicate and prevent additional submissions. Default is 5 minutes.
+const DEDUPE_WINDOW_MIN = Number(process.env.DEDUPE_WINDOW_MIN) || 1;
+const DEDUPE_WINDOW_MS = DEDUPE_WINDOW_MIN * 60 * 1000;
+
 function isoDateOnlyKey(d) {
   if (!d) return null;
   const dt = (d instanceof Date) ? d : new Date(d);
@@ -40,7 +45,26 @@ exports.createResponseWithDedupe = functions.https.onCall(async (data, context) 
   try {
     await db.runTransaction(async (tx) => {
       const snap = await tx.get(dedupeRef);
-      if (snap.exists) throw new functions.https.HttpsError('already-exists', 'Duplicate');
+      if (snap.exists) {
+        // If a dedupe key exists, check its createdAt. If it was created within
+        // the configured dedupe window, treat as a duplicate. Otherwise allow
+        // the new submission and overwrite the dedupe key atomically.
+        try {
+          const existing = snap.data();
+          const existingTs = existing && existing.createdAt && existing.createdAt.toDate ? existing.createdAt.toDate() : (existing && existing.createdAt ? new Date(existing.createdAt) : null);
+          if (existingTs) {
+            const age = Date.now() - existingTs.getTime();
+            if (age < DEDUPE_WINDOW_MS) {
+              throw new functions.https.HttpsError('already-exists', 'Duplicate');
+            }
+            // else fall through and overwrite dedupe key (allow submission)
+          }
+        } catch (e) {
+          // If anything goes wrong checking timestamp, be conservative: treat as duplicate
+          if (e instanceof functions.https.HttpsError) throw e;
+          throw new functions.https.HttpsError('already-exists', 'Duplicate');
+        }
+      }
 
       tx.set(dedupeRef, {
         responseId,

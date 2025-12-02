@@ -289,6 +289,45 @@ async function createResponseWithDedupe(payload){
   }
 }
 
+// Client-side duplicate protection: keep last-submission fingerprints in localStorage
+// so we can prevent accidental immediate re-submits (improves UX). This is a
+// convenience layer only; server-side checks are authoritative.
+const CLIENT_DEDUPE_WINDOW_MIN = 1;
+function clientIsoDateOnlyKey(d) {
+  if (!d) return null;
+  const yy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return `${yy}-${mm}-${dd}`;
+}
+
+function clientFingerprintForSubmission({ etaDate, hostUnit, visitorPhone, visitorName }){
+  const dateKey = etaDate ? clientIsoDateOnlyKey(etaDate) : 'null';
+  const unitKey = (hostUnit || '').replace(/\s+/g, '') || 'null';
+  const phone = (visitorPhone || '').replace(/[^0-9+]/g, '') || '';
+  const nameKey = visitorName ? String(visitorName).trim().toLowerCase().replace(/\s+/g,'_').slice(0,64) : '';
+  const idKey = phone || nameKey || 'noid';
+  return `${dateKey}|${unitKey}|${idKey}`;
+}
+
+function clientIsDuplicateRecently(fingerprint){
+  try {
+    const key = `lastSubmission:${fingerprint}`;
+    const raw = localStorage.getItem(key);
+    if (!raw) return { duplicate: false };
+    const ts = Number(raw);
+    if (isNaN(ts)) return { duplicate: false };
+    const age = Date.now() - ts;
+    const windowMs = CLIENT_DEDUPE_WINDOW_MIN * 60 * 1000;
+    if (age < windowMs) return { duplicate: true, age, remainingMs: windowMs - age };
+    return { duplicate: false };
+  } catch (e) { return { duplicate: false }; }
+}
+
+function clientMarkSubmission(fingerprint){
+  try { localStorage.setItem(`lastSubmission:${fingerprint}`, String(Date.now())); } catch (e) { /* ignore */ }
+}
+
 /* ---------- vehicle helpers ---------- */
 function createVehicleRow(value=''){
   const wrapper = document.createElement('div');
@@ -1118,6 +1157,15 @@ document.addEventListener('DOMContentLoaded', () => {
         updatedAt: serverTimestamp()
       };
 
+      // client-side duplicate guard: prevent same submission within short window
+      const _fingerprint = clientFingerprintForSubmission({ etaDate, hostUnit, visitorPhone, visitorName });
+      const _dupCheck = clientIsDuplicateRecently(_fingerprint);
+      if (_dupCheck && _dupCheck.duplicate) {
+        const mins = Math.ceil((_dupCheck.remainingMs || 0) / 60000);
+        showStatus(`Pendaftaran serupa dihantar baru-baru ini — sila tunggu ${mins} minit sebelum cuba lagi.`, false);
+        return;
+      }
+
       // disable submit to prevent double click / double submit
       if (submitBtn) { submitBtn.disabled = true; submitBtn.classList.add('btn-disabled'); }
 
@@ -1132,8 +1180,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (resp && resp.fallback) {
           // we succeeded but without dedupe enforcement (callable not available or blocked)
           showStatus('Pendaftaran berjaya (tanpa semakan duplikasi).', true);
+          // mark in local cache so subsequent accidental resubmits are blocked by client
+          try { clientMarkSubmission(_fingerprint); } catch(e) {}
         } else {
           showStatus('Pendaftaran berjaya. Terima kasih.', true);
+          try { clientMarkSubmission(_fingerprint); } catch(e) {}
         }
         form.reset();
         // clear any visual error state left on the hostUnit input after reset
